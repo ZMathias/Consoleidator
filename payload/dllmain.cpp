@@ -44,10 +44,12 @@ BOOL APIENTRY DllMain( HMODULE hModule,
                        LPVOID lpReserved
                      )
 {
+    //std::string str = "Error while loading: " + std::to_string(GetLastError());
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
         ClearConsole(GetStdHandle(STD_OUTPUT_HANDLE));
+		//WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.c_str(), str.length(), nullptr, nullptr);
         break;
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:

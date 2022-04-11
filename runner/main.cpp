@@ -115,12 +115,11 @@ bool InjectDllIntoForeground(HMODULE& payload_base)
 	    MessageBox(nullptr, (L"Error while opening foreground process: " + std::to_wstring(GetLastError())).c_str(), L"Error while opening process", MB_ICONERROR);
         return EXIT_FAILURE;
     }
-    //char payloadPath[MAX_PATH]{};
-    //GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
 
-    char payloadPath[] = R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\payload.dll)";
+    char payloadPath[MAX_PATH]{};
+    GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
 
-    void* lib_remote = VirtualAllocEx(hProcess, nullptr, strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
+    void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)
     {
 	    MessageBox(nullptr, (L"Error while allocating memory in remote process: " + std::to_wstring(GetLastError())).c_str(), L"Error while allocating in remote", MB_ICONERROR);
@@ -134,7 +133,7 @@ bool InjectDllIntoForeground(HMODULE& payload_base)
 	    return EXIT_FAILURE;
     }
 
-    const BOOL result = WriteProcessMemory(hProcess, lib_remote, payloadPath, sizeof payloadPath, nullptr);
+    const BOOL result = WriteProcessMemory(hProcess, lib_remote, payloadPath, __builtin_strlen(payloadPath), nullptr);
     if (result == FALSE)
     {
     	MessageBox(nullptr, (L"Error while writing to process memory of foreground window: " + std::to_wstring(GetLastError())).c_str(), L"Error while writing to process", MB_ICONERROR);
