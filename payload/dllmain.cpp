@@ -111,6 +111,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     		default:
 				break;
             }
+            UnmapViewOfFile(hMapFile);
+			CloseHandle(hMapFile);
             break;
 	    }
     case DLL_THREAD_ATTACH:
