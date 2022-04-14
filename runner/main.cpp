@@ -6,15 +6,15 @@ constexpr int INVALID_ARG_ERROR = 87;
 
 constexpr WPARAM HOTKEY_TOGGLE_SHOW = 1;
 constexpr WPARAM HOTKEY_CLEAR_CONSOLE = 2;
+constexpr WPARAM HOTKEY_MAXIMIZE_BUFFER = 3;
+constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
+constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
 
 bool isShowing{false};
 HMODULE payload_base{};
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-bool MaximizeConsoleBuffer(const HANDLE&);
-bool ClearConsole(const HANDLE&);
-bool InjectDllIntoForeground(HMODULE& payload_base);
-bool DetachDllFromForeground(const HMODULE& payload_base);
+BOOL InjectDllIntoForeground(unsigned int uiMode);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -51,6 +51,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     ShowWindow(hWnd, nCmdShow);
     RegisterHotKey(hWnd, HOTKEY_TOGGLE_SHOW, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_F5);
     RegisterHotKey(hWnd, HOTKEY_CLEAR_CONSOLE,MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_DELETE);
+    RegisterHotKey(hWnd, HOTKEY_MAXIMIZE_BUFFER, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, 0x4D);
     ShowWindow(hWnd, SW_HIDE);
 
     MSG msg{};
@@ -82,33 +83,68 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			switch (wParam)
 			{
             case HOTKEY_TOGGLE_SHOW:
-				{
-					isShowing = !isShowing;
-				}
+            	isShowing = !isShowing;
 				ShowWindow(hWnd, SW_SHOW * isShowing);
 				return 0;
             case HOTKEY_CLEAR_CONSOLE:
-            	InjectDllIntoForeground(payload_base);
+            	InjectDllIntoForeground(MODE_CLEAR_CONSOLE);
+				return 0;
+			case HOTKEY_MAXIMIZE_BUFFER:
+				InjectDllIntoForeground(MODE_MAXIMIZE_BUFFER);
 				return 0;
 			default:
-                return 0;
+				return 0;
 			}
+			
 		}
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
 }
 
-bool InjectDllIntoForeground(HMODULE& payload_base)
+BOOL InjectDllIntoForeground(unsigned int uiMode)
 {
     DWORD process_id{};
     HWND hForeground = GetForegroundWindow();
     GetWindowThreadProcessId(hForeground, &process_id);
+
+    HANDLE hMapFile = CreateFileMappingA(
+        INVALID_HANDLE_VALUE,
+		nullptr,
+		PAGE_READWRITE,
+		0,
+		sizeof(HANDLE),
+		"Local\\InjectorMapFile"
+        );
+
+    if (hMapFile == nullptr)
+	{
+        MessageBox(nullptr, (L"Failed to create file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+		return EXIT_FAILURE;
+	}
+
+    const auto lpuiCallMode = (unsigned int*)MapViewOfFile(
+        hMapFile,
+		FILE_MAP_ALL_ACCESS,
+		0,
+		0,
+		sizeof(HANDLE)
+    );
+
+
+    if (lpuiCallMode == nullptr)
+    {
+	    MessageBox(nullptr, (L"Failed to map view of file" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+        return EXIT_FAILURE;
+    }
+
     HANDLE hProcess = OpenProcess(
         PROCESS_ALL_ACCESS,
         FALSE,
         process_id
     );
+
+    *lpuiCallMode = uiMode;
 
     if (hProcess == nullptr)
     {
@@ -118,6 +154,13 @@ bool InjectDllIntoForeground(HMODULE& payload_base)
 
     char payloadPath[MAX_PATH]{};
     GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
+
+/*#ifndef _DEBUG
+    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\payload.dll)"};
+#endif
+#ifdef _DEBUG
+    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\payload.dll)"};
+#endif*/
 
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)
@@ -157,41 +200,14 @@ bool InjectDllIntoForeground(HMODULE& payload_base)
 	}
 
     WaitForSingleObject(hThread, INFINITE);
-
-    // get the HMODULE of the loaded library
-    DWORD exit_code{};
-    GetExitCodeThread(hThread, &exit_code);
-    payload_base = reinterpret_cast<HMODULE>(exit_code);
-
     if (!VirtualFreeEx(hProcess, lib_remote, 0, MEM_RELEASE)) {
         MessageBox(nullptr, (L"Error while freeing memory in remote process: " + std::to_wstring(GetLastError())).c_str(), L"Error while freeing memory", MB_ICONERROR);
 	    return EXIT_FAILURE;
     }
 
+    UnmapViewOfFile(hMapFile);
     CloseHandle(hThread);
     CloseHandle(hProcess);
+    CloseHandle(hMapFile);
     return EXIT_SUCCESS;
-}
-
-bool MaximizeConsoleBuffer(const HANDLE& hStdOut)
-{
-	
-	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
-	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
-
-	const SHORT xSize{bufferInfo.dwSize.X};
-	constexpr SHORT ySize{32766};
-
-	if (!SetConsoleScreenBufferSize(hStdOut, {xSize, ySize}))
-	{
-		const auto error = GetLastError();
-		if (error == INVALID_ARG_ERROR) printf("invalid argument\n");
-		else printf("error setting buffer size: %lu", GetLastError());
-		return true;
-	}
-
-	printf("\nbefore\nx: %i\ny: %i\n\n", bufferInfo.dwSize.X, bufferInfo.dwSize.Y);
-	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
-	printf("after\nx: %i\ny: %i\n", bufferInfo.dwSize.X, bufferInfo.dwSize.Y);
-	return false;
 }

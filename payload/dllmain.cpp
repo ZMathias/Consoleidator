@@ -2,6 +2,29 @@
 #include "pch.h"
 #include <string>
 
+constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
+constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
+
+bool MaximizeConsoleBuffer(const HANDLE& hStdOut)
+{
+	
+	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
+	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
+
+	const SHORT xSize{bufferInfo.dwSize.X};
+	constexpr SHORT ySize{32766};
+
+	if (!SetConsoleScreenBufferSize(hStdOut, {xSize, ySize}))
+	{
+		return false;
+	}
+
+	printf("\nbefore\nx: %i\ny: %i\n\n", bufferInfo.dwSize.X, bufferInfo.dwSize.Y);
+	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
+	printf("after\nx: %i\ny: %i\n", bufferInfo.dwSize.X, bufferInfo.dwSize.Y);
+	return true;
+}
+
 bool ClearConsole(const HANDLE& hStdOut)
 {
 	// Fetch existing console mode so we correctly add a flag and not turn off others
@@ -44,13 +67,52 @@ BOOL APIENTRY DllMain( HMODULE hModule,
                        LPVOID lpReserved
                      )
 {
-    //std::string str = "Error while loading: " + std::to_string(GetLastError());
+
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
-        ClearConsole(GetStdHandle(STD_OUTPUT_HANDLE));
-		//WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str.c_str(), str.length(), nullptr, nullptr);
-        break;
+	    {
+            auto hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    		HANDLE hMapFile = OpenFileMappingA(
+				FILE_MAP_ALL_ACCESS, 
+				FALSE, 
+				"Local\\InjectorMapFile"
+			);
+    		if (hMapFile == nullptr)
+    		{
+    			const std::wstring strError = L"Failed to open mapped file: " + std::to_wstring(GetLastError());
+    			WriteConsole(hStdOut, strError.c_str(), (DWORD)strError.size(), nullptr, nullptr);
+    			return FALSE;
+    		}
+
+    		auto lpuiMode = (unsigned int*)MapViewOfFile(
+				hMapFile,
+				FILE_MAP_ALL_ACCESS,
+				0,
+				0,
+				sizeof(HANDLE)
+			);
+
+    		if (lpuiMode == nullptr)
+    		{
+    			const std::wstring strError = L"Failed to map view of file: " + std::to_wstring(GetLastError());
+    			WriteConsole(hStdOut, strError.c_str(), (DWORD)strError.size(), nullptr, nullptr);
+                return FALSE;
+    		}
+
+            switch (*lpuiMode)
+            {
+	            case MODE_CLEAR_CONSOLE:
+		            ClearConsole(hStdOut);
+		            break;
+                case MODE_MAXIMIZE_BUFFER:
+					MaximizeConsoleBuffer(hStdOut);
+					break;
+    		default:
+				break;
+            }
+            break;
+	    }
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
     case DLL_PROCESS_DETACH:
