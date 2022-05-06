@@ -1,1 +1,1 @@
-A tiny universal console utility suite. Dinamically locates foreground CMD and injects utility code into it. 
+A tiny universal console utility suite. Dynamically locates foreground CMD and injects utility code into it. 
