@@ -4,17 +4,48 @@
 
 constexpr int INVALID_ARG_ERROR = 87;
 
+// wparam constants for receiving the hotkey message
 constexpr WPARAM HOTKEY_TOGGLE_SHOW = 1;
 constexpr WPARAM HOTKEY_CLEAR_CONSOLE = 2;
 constexpr WPARAM HOTKEY_MAXIMIZE_BUFFER = 3;
+constexpr WPARAM HOTKEY_RESET = 8;
+constexpr WPARAM HOTKEY_FOREGROUND_FORWARD = 4;
+constexpr WPARAM HOTKEY_FOREGROUND_BACKWARD = 5;
+constexpr WPARAM HOTKEY_BACKGROUND_FORWARD = 6;
+constexpr WPARAM HOTKEY_BACKGROUND_BACKWARD = 7;
+
+// DLL hooking modes set in the mapped memory
 constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
 constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
+constexpr unsigned int MODE_RESET = 7;
+constexpr unsigned int CYCLE_FOREGROUND_FORWARD = 3;
+constexpr unsigned int CYCLE_FOREGROUND_BACKWARD = 4;
+constexpr unsigned int CYCLE_BACKGROUND_FORWARD = 5;
+constexpr unsigned int CYCLE_BACKGROUND_BACKWARD = 6;
 
 bool isShowing{false};
 HMODULE payload_base{};
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 BOOL InjectDllIntoForeground(unsigned int uiMode);
+
+bool RegisterHotkeys(HWND hWnd)
+{
+    // if already bound, then another instance is already running. Abort.
+	if (RegisterHotKey(hWnd, HOTKEY_TOGGLE_SHOW, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_F5) == 0) return false;
+    RegisterHotKey(hWnd, HOTKEY_CLEAR_CONSOLE, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_DELETE);
+	RegisterHotKey(hWnd, HOTKEY_MAXIMIZE_BUFFER, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, 0x4D);
+    RegisterHotKey(hWnd, HOTKEY_RESET, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_END);
+
+    //hotkey for cycling through the foreground cmd colors with CTRL + SHIFT + LEFT/RIGHTARROW
+    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_LEFT);
+    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_RIGHT);
+
+    //hotkey for cycling through the background cmd colors with CTRL + SHIFT + UP/DOWNARROW
+    RegisterHotKey(hWnd, HOTKEY_BACKGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_DOWN);
+	RegisterHotKey(hWnd, HOTKEY_BACKGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_UP);
+    return true;
+}
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -49,9 +80,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     }
 
     ShowWindow(hWnd, nCmdShow);
-    RegisterHotKey(hWnd, HOTKEY_TOGGLE_SHOW, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_F5);
-    RegisterHotKey(hWnd, HOTKEY_CLEAR_CONSOLE,MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_DELETE);
-    RegisterHotKey(hWnd, HOTKEY_MAXIMIZE_BUFFER, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, 0x4D);
+    if (RegisterHotkeys(hWnd) == false) return 0;
     ShowWindow(hWnd, SW_HIDE);
 
     MSG msg{};
@@ -91,6 +120,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				return 0;
 			case HOTKEY_MAXIMIZE_BUFFER:
 				InjectDllIntoForeground(MODE_MAXIMIZE_BUFFER);
+				return 0;
+			case HOTKEY_RESET:
+				InjectDllIntoForeground(MODE_RESET);
+				return 0;
+			case HOTKEY_FOREGROUND_FORWARD:
+				InjectDllIntoForeground(CYCLE_FOREGROUND_FORWARD);
+				return 0;
+			case HOTKEY_FOREGROUND_BACKWARD:
+				InjectDllIntoForeground(CYCLE_FOREGROUND_BACKWARD);
+				return 0;
+			case HOTKEY_BACKGROUND_FORWARD:
+				InjectDllIntoForeground(CYCLE_BACKGROUND_FORWARD);
+				return 0;
+			case HOTKEY_BACKGROUND_BACKWARD:
+				InjectDllIntoForeground(CYCLE_BACKGROUND_BACKWARD);
 				return 0;
 			default:
 				return 0;
@@ -152,15 +196,15 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
         return EXIT_FAILURE;
     }
 
-    char payloadPath[MAX_PATH]{};
-    GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
+    //char payloadPath[MAX_PATH]{};
+    //GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
 
-/*#ifndef _DEBUG
+#ifndef _DEBUG
     char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\payload.dll)"};
 #endif
 #ifdef _DEBUG
     char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\payload.dll)"};
-#endif*/
+#endif
 
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)
