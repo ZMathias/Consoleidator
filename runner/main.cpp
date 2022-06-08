@@ -196,15 +196,16 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
         return EXIT_FAILURE;
     }
 
-    //char payloadPath[MAX_PATH]{};
-    //GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
+    char payloadPath[MAX_PATH]{};
+    GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
 
-#ifndef _DEBUG
+    // this is here because of visual studios stupid run environment
+/*#ifndef _DEBUG
     char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\payload.dll)"};
 #endif
 #ifdef _DEBUG
     char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\payload.dll)"};
-#endif
+#endif*/
 
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)
