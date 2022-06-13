@@ -124,6 +124,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			case HOTKEY_MAXIMIZE_BUFFER:
 				InjectDllIntoForeground(MODE_MAXIMIZE_BUFFER);
 				return 0;
+            case HOTKEY_RESET_INVERT:
+                InjectDllIntoForeground(MODE_RESET_INVERT);
+                return 0;
 			case HOTKEY_RESET:
 				InjectDllIntoForeground(MODE_RESET);
 				return 0;
@@ -203,12 +206,12 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
     GetFullPathNameA(payloadNameA, MAX_PATH, payloadPath, nullptr);
 
     // this is here because of visual studios stupid run environment
-/*#ifndef _DEBUG
-    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\payload.dll)"};
-#endif
-#ifdef _DEBUG
-    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\payload.dll)"};
-#endif*/
+//#ifndef _DEBUG
+//    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\consoleidator-injectable.dll)"};
+//#endif
+//#ifdef _DEBUG
+//    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\payload.dll)"};
+//#endif
 
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)

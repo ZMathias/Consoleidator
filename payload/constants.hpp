@@ -8,6 +8,7 @@
 constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
 constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
 constexpr unsigned int MODE_RESET = 7;
+constexpr unsigned int MODE_RESET_INVERT = 8;
 constexpr unsigned int CYCLE_FOREGROUND_FORWARD = 3;
 constexpr unsigned int CYCLE_FOREGROUND_BACKWARD = 4;
 constexpr unsigned int CYCLE_BACKGROUND_FORWARD = 5;

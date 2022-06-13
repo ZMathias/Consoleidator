@@ -141,12 +141,12 @@ bool CycleBackground(const HANDLE& hStdOut, const bool forward)
 	}
 }
 
-bool ResetConsole(const HANDLE& hStdOut)
+bool ResetConsole(const HANDLE& hStdOut, const bool& invert = false)
 {
 	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
 	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
 
-	if (FillConsoleOutputAttributeAndSet(hStdOut, 0x0F, BUFFER_LENGTH) == 0) return false;
+	if (FillConsoleOutputAttributeAndSet(hStdOut, invert ? 0xF0 : 0x0F, BUFFER_LENGTH) == 0) return false;
 	return true;
 }
 
@@ -198,6 +198,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 					break;
     			case MODE_RESET:
 					ResetConsole(hStdOut);
+					break;
+				case MODE_RESET_INVERT:
+					ResetConsole(hStdOut, true);
 					break;
 				case CYCLE_FOREGROUND_FORWARD:
 					CycleForeground(hStdOut, true);
