@@ -4,8 +4,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.1.32328.378
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "runner", "runner\runner.vcxproj", "{84974A1F-242D-4C6D-B648-BD7249D2F4DE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{5CB366A1-B1E0-4553-8880-ECD76148D402} = {5CB366A1-B1E0-4553-8880-ECD76148D402}
+		{CC5AAE50-1416-4108-9553-0E69421C704F} = {CC5AAE50-1416-4108-9553-0E69421C704F}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "payload", "payload\payload.vcxproj", "{5CB366A1-B1E0-4553-8880-ECD76148D402}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hotkey-parser", "hotkeyparser\hotkeyparser.vcxproj", "{CC5AAE50-1416-4108-9553-0E69421C704F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +37,14 @@ Global
 		{5CB366A1-B1E0-4553-8880-ECD76148D402}.Release|x64.Build.0 = Release|x64
 		{5CB366A1-B1E0-4553-8880-ECD76148D402}.Release|x86.ActiveCfg = Release|Win32
 		{5CB366A1-B1E0-4553-8880-ECD76148D402}.Release|x86.Build.0 = Release|Win32
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Debug|x64.ActiveCfg = Debug|x64
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Debug|x64.Build.0 = Debug|x64
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Debug|x86.ActiveCfg = Debug|Win32
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Debug|x86.Build.0 = Debug|Win32
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Release|x64.ActiveCfg = Release|x64
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Release|x64.Build.0 = Release|x64
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Release|x86.ActiveCfg = Release|Win32
+		{CC5AAE50-1416-4108-9553-0E69421C704F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

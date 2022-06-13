@@ -1,20 +1,7 @@
-// dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 #include <string>
 #include <cstdlib>
-
-#define FOREGROUND_COMPONENT (bufferInfo.wAttributes & 0x000F)
-#define BACKGROUND_COMPONENT (bufferInfo.wAttributes & 0x00F0)
-#define BUFFER_LENGTH (bufferInfo.dwSize.X * bufferInfo.dwSize.Y)
-
-// DLL hooking modes set in the mapped memory
-constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
-constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
-constexpr unsigned int MODE_RESET = 7;
-constexpr unsigned int CYCLE_FOREGROUND_FORWARD = 3;
-constexpr unsigned int CYCLE_FOREGROUND_BACKWARD = 4;
-constexpr unsigned int CYCLE_BACKGROUND_FORWARD = 5;
-constexpr unsigned int CYCLE_BACKGROUND_BACKWARD = 6;
+#include "constants.hpp"
 
 bool FillConsoleOutputAttributeAndSet(const HANDLE& hStdOut, const WORD& wAttributes, const DWORD& dwLength)
 {
@@ -59,7 +46,7 @@ bool ClearConsole(const HANDLE& hStdOut)
 
     // Write the sequence for clearing the display.
     DWORD written = 0;
-    constexpr PCWSTR sequence = L"\x1b[2J";
+    constexpr PCWSTR sequence = L"\x1b[2J\x1b[3J";
     if (!WriteConsoleW(hStdOut, sequence, static_cast<DWORD>(wcslen(sequence)), &written, nullptr))
     {
         // If we fail, try to restore the mode on the way out.
@@ -67,14 +54,6 @@ bool ClearConsole(const HANDLE& hStdOut)
         return EXIT_FAILURE;
     }
 
-    // To also clear the scroll back, emit L"\x1b[3J" as well.
-    // 2J only clears the visible window and 3J only clears the scroll back.
-	constexpr PCWSTR scrollSequence = L"\x1b[3J";
-	if (!WriteConsoleW(hStdOut, scrollSequence, static_cast<DWORD>(wcslen(scrollSequence)), &written, nullptr))
-	{
-		SetConsoleMode(hStdOut, originalMode);
-		return EXIT_FAILURE;
-	}
 
 	SetConsoleCursorPosition(hStdOut, {0, 0});
 
@@ -137,7 +116,6 @@ bool CycleBackground(const HANDLE& hStdOut, const bool forward)
 		{
 			if (FillConsoleOutputAttributeAndSet(hStdOut, 0x000F & bufferInfo.wAttributes, BUFFER_LENGTH) == 0)
 			{
-				SetConsoleTitleW(L"Returned false!");
 				return false;
 			}
 			return true;
@@ -145,7 +123,6 @@ bool CycleBackground(const HANDLE& hStdOut, const bool forward)
 		else
 		{
 			if (FillConsoleOutputAttributeAndSet(hStdOut, bufferInfo.wAttributes + 0x0010, BUFFER_LENGTH) == 0) return false;
-			SetConsoleTitleW((L"Set color " + std::to_wstring(bufferInfo.wAttributes)).c_str());
 			return true;
 		}
 	}
@@ -159,7 +136,6 @@ bool CycleBackground(const HANDLE& hStdOut, const bool forward)
 		else
 		{
 			if (FillConsoleOutputAttributeAndSet(hStdOut, bufferInfo.wAttributes - 0x0010, BUFFER_LENGTH) == 0) return false;
-			SetConsoleTitleW((L"Set color " + std::to_wstring(bufferInfo.wAttributes)).c_str());
 			return true;
 		}
 	}
@@ -197,7 +173,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     			return FALSE;
     		}
 
-    		auto lpuiMode = (unsigned int*)MapViewOfFile(
+    		const auto lpuiMode = (unsigned int*)MapViewOfFile(
 				hMapFile,
 				FILE_MAP_ALL_ACCESS,
 				0,

@@ -1,27 +1,7 @@
 #include <Windows.h>
 #include <cstdio>
 #include <string>
-
-constexpr int INVALID_ARG_ERROR = 87;
-
-// wparam constants for receiving the hotkey message
-constexpr WPARAM HOTKEY_TOGGLE_SHOW = 1;
-constexpr WPARAM HOTKEY_CLEAR_CONSOLE = 2;
-constexpr WPARAM HOTKEY_MAXIMIZE_BUFFER = 3;
-constexpr WPARAM HOTKEY_RESET = 8;
-constexpr WPARAM HOTKEY_FOREGROUND_FORWARD = 4;
-constexpr WPARAM HOTKEY_FOREGROUND_BACKWARD = 5;
-constexpr WPARAM HOTKEY_BACKGROUND_FORWARD = 6;
-constexpr WPARAM HOTKEY_BACKGROUND_BACKWARD = 7;
-
-// DLL hooking modes set in the mapped memory
-constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
-constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
-constexpr unsigned int MODE_RESET = 7;
-constexpr unsigned int CYCLE_FOREGROUND_FORWARD = 3;
-constexpr unsigned int CYCLE_FOREGROUND_BACKWARD = 4;
-constexpr unsigned int CYCLE_BACKGROUND_FORWARD = 5;
-constexpr unsigned int CYCLE_BACKGROUND_BACKWARD = 6;
+#include "runner-constants.hpp"
 
 bool isShowing{false};
 HMODULE payload_base{};
@@ -29,23 +9,9 @@ HMODULE payload_base{};
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 BOOL InjectDllIntoForeground(unsigned int uiMode);
 
-bool RegisterHotkeys(HWND hWnd)
-{
-    // if already bound, then another instance is already running. Abort.
-	if (RegisterHotKey(hWnd, HOTKEY_TOGGLE_SHOW, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_F5) == 0) return false;
-    RegisterHotKey(hWnd, HOTKEY_CLEAR_CONSOLE, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_DELETE);
-	RegisterHotKey(hWnd, HOTKEY_MAXIMIZE_BUFFER, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, 0x4D);
-    RegisterHotKey(hWnd, HOTKEY_RESET, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_END);
-
-    //hotkey for cycling through the foreground cmd colors with CTRL + SHIFT + LEFT/RIGHTARROW
-    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_LEFT);
-    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_RIGHT);
-
-    //hotkey for cycling through the background cmd colors with CTRL + SHIFT + UP/DOWNARROW
-    RegisterHotKey(hWnd, HOTKEY_BACKGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_DOWN);
-	RegisterHotKey(hWnd, HOTKEY_BACKGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_UP);
-    return true;
-}
+//bool RegisterHotkeys(HWND hWnd);
+HHOOK SetKeyboardHook();
+WPARAM ConvertToMessage(WPARAM wParam);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -80,8 +46,44 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     }
 
     ShowWindow(hWnd, nCmdShow);
-    if (RegisterHotkeys(hWnd) == false) return 0;
     ShowWindow(hWnd, SW_HIDE);
+
+    HANDLE hMapFile = CreateFileMappingA(
+        INVALID_HANDLE_VALUE, 
+        nullptr, 
+        PAGE_READWRITE, 
+        0, 
+        sizeof(HANDLE), 
+        "Local\\HotKeyParser"
+    );
+
+    if (hMapFile == nullptr)
+    {
+        MessageBox(nullptr, (L"Failed to create keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+	    return false;
+    }
+
+    const auto mappedhWnd = (HWND*)MapViewOfFile(
+        hMapFile,
+		FILE_MAP_WRITE,
+		0,
+		0,
+		sizeof(HWND)
+    );
+
+    if (mappedhWnd == nullptr)
+    {
+	    MessageBox(nullptr, (L"Failed to map keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+	    return false;
+    }
+
+    *mappedhWnd = hWnd;
+
+    if (SetKeyboardHook() == nullptr) return 0;
+    //if (RegisterHotkeys(hWnd) == false) return 0;
+
+    CloseHandle(hMapFile);
+    UnmapViewOfFile(mappedhWnd);
 
     MSG msg{};
     while (GetMessage(&msg, nullptr, 0, 0) > 0)
@@ -107,9 +109,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			EndPaint(hWnd, &ps);
             return 0;
 		}
-	case WM_HOTKEY:
+	case WM_PROCESS_KEY:
 		{
-			switch (wParam)
+			const auto keyMsg = ConvertToMessage(wParam);
+			switch (keyMsg)
 			{
             case HOTKEY_TOGGLE_SHOW:
             	isShowing = !isShowing;
@@ -157,7 +160,7 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
 		nullptr,
 		PAGE_READWRITE,
 		0,
-		sizeof(HANDLE),
+		sizeof(unsigned int),
 		"Local\\InjectorMapFile"
         );
 
@@ -172,7 +175,7 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
 		FILE_MAP_ALL_ACCESS,
 		0,
 		0,
-		sizeof(HANDLE)
+		sizeof(unsigned int)
     );
 
 
@@ -197,7 +200,7 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
     }
 
     char payloadPath[MAX_PATH]{};
-    GetFullPathNameA("payload.dll", MAX_PATH, payloadPath, nullptr);
+    GetFullPathNameA(payloadNameA, MAX_PATH, payloadPath, nullptr);
 
     // this is here because of visual studios stupid run environment
 /*#ifndef _DEBUG
@@ -256,3 +259,59 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
     CloseHandle(hMapFile);
     return EXIT_SUCCESS;
 }
+
+// returns nullptr if failed
+HHOOK SetKeyboardHook()
+{
+	HOOKPROC hookProc{};
+    static HINSTANCE hHookDll{};
+
+    //load keyboardproc dll
+    hHookDll = LoadLibrary(hookDllNameW);
+    if (hHookDll == nullptr)
+		return nullptr;
+
+    //get functions memory address
+    hookProc = reinterpret_cast<HOOKPROC>(GetProcAddress(hHookDll, "KeyboardProc"));
+    return SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hHookDll, 0);
+}
+
+WPARAM ConvertToMessage(WPARAM wParam)
+{
+    SHORT bitmask{};
+
+	// parses the states into a bitmask in (almost) the same way as windows does
+	// SHIFT - first bit (0x0001)
+	// CONTROL - second bit (0x0002)
+	// ALT - third bit (0x0004)
+	//precast the bitmask to avoid casting it three times
+
+	bitmask |= ((GetAsyncKeyState(VK_LSHIFT) & 0x8000) == 0x00008000);
+	bitmask |= ((GetAsyncKeyState(VK_LCONTROL) & 0x8000) == 0x00008000) << 1;
+	bitmask |= ((GetAsyncKeyState(VK_LMENU) & 0x8000) == 0x00008000) << 2;
+    if (bitmask == 0) return 0;
+	for (int i = 0; i < sizeof registeredCombos / sizeof Keycombo; ++i)
+	{
+		if (wParam == registeredCombos[i].vkCode && bitmask == registeredCombos[i].bitmask)
+			return registeredCombos[i].message;
+	}
+    return 0;
+}
+
+/*bool RegisterHotkeys(HWND hWnd)
+{
+    // if already bound, then another instance is already running. Abort.
+	if (RegisterHotKey(hWnd, HOTKEY_TOGGLE_SHOW, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_F5) == 0) return false;
+    RegisterHotKey(hWnd, HOTKEY_CLEAR_CONSOLE, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_DELETE);
+	RegisterHotKey(hWnd, HOTKEY_MAXIMIZE_BUFFER, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, 0x4D);
+    RegisterHotKey(hWnd, HOTKEY_RESET, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_END);
+
+    //hotkey for cycling through the foreground cmd colors with CTRL + SHIFT + LEFT/RIGHTARROW
+    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_LEFT);
+    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_RIGHT);
+
+    //hotkey for cycling through the background cmd colors with CTRL + SHIFT + UP/DOWNARROW
+    RegisterHotKey(hWnd, HOTKEY_BACKGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_DOWN);
+	RegisterHotKey(hWnd, HOTKEY_BACKGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_UP);
+    return true;
+}*/
