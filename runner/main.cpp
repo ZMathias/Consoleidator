@@ -210,7 +210,7 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
 //    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\consoleidator-injectable.dll)"};
 //#endif
 //#ifdef _DEBUG
-//    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\payload.dll)"};
+//    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\consoleidator-injectable.dll)"};
 //#endif
 
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
@@ -266,16 +266,15 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
 // returns nullptr if failed
 HHOOK SetKeyboardHook()
 {
-	HOOKPROC hookProc{};
     static HINSTANCE hHookDll{};
 
-    //load keyboardproc dll
+    //load KeyboardProc dll
     hHookDll = LoadLibrary(hookDllNameW);
     if (hHookDll == nullptr)
 		return nullptr;
 
     //get functions memory address
-    hookProc = reinterpret_cast<HOOKPROC>(GetProcAddress(hHookDll, "KeyboardProc"));
+    HOOKPROC hookProc = reinterpret_cast<HOOKPROC>(GetProcAddress(hHookDll, "KeyboardProc"));
     return SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hHookDll, 0);
 }
 
