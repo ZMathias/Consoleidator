@@ -1,17 +1,21 @@
 #include <Windows.h>
 #include <cstdio>
 #include <string>
+
+#include "resource.h"
 #include "runner-constants.hpp"
 
+NOTIFYICONDATA nid;
 bool isShowing{false};
 HMODULE payload_base{};
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 BOOL InjectDllIntoForeground(unsigned int uiMode);
-
+HINSTANCE hInstance_;
 //bool RegisterHotkeys(HWND hWnd);
 HHOOK SetKeyboardHook();
 WPARAM ConvertToMessage(WPARAM wParam);
+BOOL ToggleTray(HWND, HINSTANCE hInstance);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -78,12 +82,20 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     }
 
     *mappedhWnd = hWnd;
+    hInstance_ = hInstance;
 
     if (SetKeyboardHook() == nullptr) return 0;
     //if (RegisterHotkeys(hWnd) == false) return 0;
 
     CloseHandle(hMapFile);
     UnmapViewOfFile(mappedhWnd);
+
+    // after all setup logic is done successfully, then load the tray icon
+    if (!ToggleTray(hWnd, hInstance)) 
+    {
+        MessageBox(nullptr, L"Failed to add to tray", L"Error", MB_ICONERROR);
+    	return 0;
+    }
 
     MSG msg{};
     while (GetMessage(&msg, nullptr, 0, 0) > 0)
@@ -93,6 +105,24 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     }
     return 0;
 }
+
+BOOL ToggleTray(HWND hWnd, HINSTANCE hInstance)
+{
+    if (!isShowing)
+    {
+	    wchar_t szTip[128] = L"Consoleidator";
+		nid.cbSize = sizeof NOTIFYICONDATA;
+		nid.hWnd = hWnd;
+		nid.uID = 100;
+		nid.uVersion = NOTIFYICON_VERSION;
+		nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+		wcscpy_s(nid.szTip, 128, szTip);
+		nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+		return Shell_NotifyIcon(NIM_ADD, &nid);
+    }
+    return Shell_NotifyIcon(NIM_DELETE, &nid);
+}
+
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -116,7 +146,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
             case HOTKEY_TOGGLE_SHOW:
             	isShowing = !isShowing;
-				ShowWindow(hWnd, SW_SHOW * isShowing);
+                if (isShowing)
+                {
+	                ShowWindow(hWnd, SW_SHOW);
+                }
+                else AnimateWindow(hWnd, 200, AW_HIDE | AW_VER_POSITIVE | AW_SLIDE | AW_HOR_POSITIVE);
+                ToggleTray(hWnd, hInstance_);
 				return 0;
             case HOTKEY_CLEAR_CONSOLE:
             	InjectDllIntoForeground(MODE_CLEAR_CONSOLE);
@@ -278,15 +313,17 @@ HHOOK SetKeyboardHook()
     return SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hHookDll, 0);
 }
 
+/*
+ * return 0 for bitmask if NO modifier key is pressed, otherwise returns bitmask of pressed modifier keys
+ * parses the states into a bitmask in (almost?) the same way as windows does
+ *
+ *	    // SHIFT - first bit (0x0001)
+ *      // CONTROL - second bit (0x0002)
+ *      // ALT - third bit (0x0004)
+*/
 WPARAM ConvertToMessage(WPARAM wParam)
 {
     SHORT bitmask{};
-
-	// parses the states into a bitmask in (almost) the same way as windows does
-	// SHIFT - first bit (0x0001)
-	// CONTROL - second bit (0x0002)
-	// ALT - third bit (0x0004)
-	//precast the bitmask to avoid casting it three times
 
 	bitmask |= ((GetAsyncKeyState(VK_LSHIFT) & 0x8000) == 0x00008000);
 	bitmask |= ((GetAsyncKeyState(VK_LCONTROL) & 0x8000) == 0x00008000) << 1;
@@ -299,21 +336,3 @@ WPARAM ConvertToMessage(WPARAM wParam)
 	}
     return 0;
 }
-
-/*bool RegisterHotkeys(HWND hWnd)
-{
-    // if already bound, then another instance is already running. Abort.
-	if (RegisterHotKey(hWnd, HOTKEY_TOGGLE_SHOW, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_F5) == 0) return false;
-    RegisterHotKey(hWnd, HOTKEY_CLEAR_CONSOLE, MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, VK_DELETE);
-	RegisterHotKey(hWnd, HOTKEY_MAXIMIZE_BUFFER, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, 0x4D);
-    RegisterHotKey(hWnd, HOTKEY_RESET, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_END);
-
-    //hotkey for cycling through the foreground cmd colors with CTRL + SHIFT + LEFT/RIGHTARROW
-    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_LEFT);
-    RegisterHotKey(hWnd, HOTKEY_FOREGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_RIGHT);
-
-    //hotkey for cycling through the background cmd colors with CTRL + SHIFT + UP/DOWNARROW
-    RegisterHotKey(hWnd, HOTKEY_BACKGROUND_BACKWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_DOWN);
-	RegisterHotKey(hWnd, HOTKEY_BACKGROUND_FORWARD, MOD_SHIFT | MOD_CONTROL | MOD_NOREPEAT, VK_UP);
-    return true;
-}*/
