@@ -16,6 +16,7 @@ HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL InjectDllIntoForeground(unsigned int uiMode);
 
+// used to set correct dll paths for the payload
 #define RELEASE
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
@@ -160,6 +161,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
 	            isShowing = true;
 				ShowWindow(hWnd, SW_SHOW);
+                ToggleTray(hWnd, hInstance_);
                 return 0;
             }
 

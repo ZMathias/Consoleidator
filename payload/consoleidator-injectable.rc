@@ -47,30 +47,6 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Icon
-//
-
-// Icon with lowest ID value placed first to ensure application icon
-// remains consistent on all systems.
-IDI_ICON1               ICON                    "icon1.ico"
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// Menu
-//
-
-IDR_MENU1 MENU
-BEGIN
-    POPUP "File"
-    BEGIN
-        MENUITEM "Exit",                        ID__EXIT
-    END
-END
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
 // Version
 //
 
@@ -84,7 +60,7 @@ VS_VERSION_INFO VERSIONINFO
  FILEFLAGS 0x0L
 #endif
  FILEOS 0x40004L
- FILETYPE 0x1L
+ FILETYPE 0x2L
  FILESUBTYPE 0x0L
 BEGIN
     BLOCK "StringFileInfo"
@@ -92,12 +68,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "ZMathias"
-            VALUE "FileDescription", "Consoleidator command-line shortcut tool."
+            VALUE "FileDescription", "Injectable file for Consoleidator."
             VALUE "FileVersion", "0.2.2.0"
-            VALUE "InternalName", "consoleidator.exe"
+            VALUE "InternalName", "consoleidator-injectable.dll"
             VALUE "LegalCopyright", "Copyright (C) 2022"
-            VALUE "OriginalFilename", "consoleidator.exe"
-            VALUE "ProductName", "Consoleidator"
+            VALUE "OriginalFilename", "consoleidator-injectable.dll"
+            VALUE "ProductName", "Consoleidator Injectable"
             VALUE "ProductVersion", "0.2.2.0"
         END
     END
