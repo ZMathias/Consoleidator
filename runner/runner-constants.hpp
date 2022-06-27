@@ -2,6 +2,9 @@
 
 // wparam constants for receiving the hotkey message
 constexpr UINT WM_PROCESS_KEY = WM_USER + 1;
+constexpr UINT WM_TRAYNOTIFY = WM_USER + 2;
+constexpr UINT ID__SHOW = WM_USER + 3;
+constexpr UINT ID__EXIT = WM_USER + 4;
 constexpr WPARAM HOTKEY_TOGGLE_SHOW = 1;
 constexpr WPARAM HOTKEY_CLEAR_CONSOLE = 2;
 constexpr WPARAM HOTKEY_MAXIMIZE_BUFFER = 3;

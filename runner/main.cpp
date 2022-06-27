@@ -1,43 +1,43 @@
 #include <Windows.h>
 #include <cstdio>
 #include <string>
-
 #include "resource.h"
 #include "runner-constants.hpp"
+
+//#define RELEASE
 
 NOTIFYICONDATA nid;
 bool isShowing{false};
 HMODULE payload_base{};
+HINSTANCE hInstance_;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-BOOL InjectDllIntoForeground(unsigned int uiMode);
-HINSTANCE hInstance_;
-//bool RegisterHotkeys(HWND hWnd);
-HHOOK SetKeyboardHook();
 WPARAM ConvertToMessage(WPARAM wParam);
+HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
+BOOL InjectDllIntoForeground(unsigned int uiMode);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
     // Register the window class.
-    constexpr wchar_t CLASS_NAME[]  = L" ";
+    constexpr wchar_t CLASS_NAME[]  = L"Consoleidator";
     
-    WNDCLASS wc = { };
+    WNDCLASS wc{};
 
     wc.lpfnWndProc   = WindowProc;
     wc.hInstance     = hInstance;
     wc.lpszClassName = CLASS_NAME;
+    wc.hIcon         = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
 
     RegisterClass(&wc);
 
     // Create the window.
-
     HWND hWnd = CreateWindowEx(
         0,                             
         CLASS_NAME,                    
         L" ",
         WS_OVERLAPPEDWINDOW,           
-        0, 0, 10, 10,
+        0, 0, 400, 200,
         nullptr,
         nullptr,
         hInstance,
@@ -85,7 +85,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     hInstance_ = hInstance;
 
     if (SetKeyboardHook() == nullptr) return 0;
-    //if (RegisterHotkeys(hWnd) == false) return 0;
 
     CloseHandle(hMapFile);
     UnmapViewOfFile(mappedhWnd);
@@ -118,6 +117,7 @@ BOOL ToggleTray(HWND hWnd, HINSTANCE hInstance)
 		nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
 		wcscpy_s(nid.szTip, 128, szTip);
 		nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+        nid.uCallbackMessage = WM_TRAYNOTIFY;
 		return Shell_NotifyIcon(NIM_ADD, &nid);
     }
     return Shell_NotifyIcon(NIM_DELETE, &nid);
@@ -128,6 +128,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch (uMsg)
 	{
+	case WM_CLOSE:
+		AnimateWindow(hWnd, 100, AW_HIDE | AW_VER_POSITIVE | AW_SLIDE | AW_HOR_POSITIVE);
+        isShowing = false;
+		ToggleTray(hWnd, hInstance_);
+        return 0;		
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -139,19 +144,79 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			EndPaint(hWnd, &ps);
             return 0;
 		}
+	case WM_TRAYNOTIFY:
+		{
+            if (lParam == 512) return 0;
+			if (lParam == WM_RBUTTONUP)
+			{
+                HMENU hMenu = CreatePopupMenu();
+
+                wchar_t szShow[] = L"Show";
+                wchar_t szExit[] = L"Exit";
+				MENUITEMINFO mii;
+                mii.cbSize = sizeof(MENUITEMINFO);
+				mii.fMask = MIIM_STRING | MIIM_ID | MIIM_STATE;
+				mii.fState = MFS_ENABLED;
+				mii.fType = MFT_STRING;
+				mii.wID = ID__SHOW;
+                mii.dwTypeData = szShow;
+				mii.cch = sizeof szShow;
+
+                InsertMenuItem(hMenu, ID__SHOW, FALSE, &mii);
+
+                mii.wID = ID__EXIT;
+                mii.dwTypeData = szExit;
+				mii.cch = sizeof szExit;
+
+				InsertMenuItem(hMenu, ID__EXIT, FALSE, &mii);
+				SetMenuDefaultItem(hMenu, ID__SHOW, false);
+                POINT cursor{};
+				GetCursorPos(&cursor);
+                SetForegroundWindow(hWnd); // a hack to make the menu disappear when the mouse is clicked outside of it, windows requires it
+				if (TrackPopupMenuEx(hMenu, TPM_LEFTALIGN, cursor.x, cursor.y,hWnd, nullptr) == 0)
+				{
+					MessageBox(hWnd, (L"Failed to show menu: " + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+                    return 0;
+				}
+			}
+            return 0;
+		}
+	case WM_COMMAND:
+		{
+			const auto wmID = LOWORD(wParam);
+            const auto wmEvent = HIWORD(wParam);
+            switch (wmID)
+			{
+            case ID__SHOW:
+				isShowing = true;
+				ShowWindow(hWnd, SW_SHOW);
+                ToggleTray(hWnd, hInstance_);
+                return 0;
+            case ID__EXIT:
+				PostQuitMessage(0);
+                return 0;
+            default:
+                return 0;
+            }
+		}
 	case WM_PROCESS_KEY:
 		{
 			const auto keyMsg = ConvertToMessage(wParam);
 			switch (keyMsg)
 			{
             case HOTKEY_TOGGLE_SHOW:
-            	isShowing = !isShowing;
-                if (isShowing)
+                if (!isShowing)
                 {
+                    isShowing = true;
 	                ShowWindow(hWnd, SW_SHOW);
+                    ToggleTray(hWnd, hInstance_);
                 }
-                else AnimateWindow(hWnd, 200, AW_HIDE | AW_VER_POSITIVE | AW_SLIDE | AW_HOR_POSITIVE);
-                ToggleTray(hWnd, hInstance_);
+				else 
+                {
+                    isShowing = false;
+                	ShowWindow(hWnd, SW_HIDE);
+                    ToggleTray(hWnd, hInstance_);
+                }
 				return 0;
             case HOTKEY_CLEAR_CONSOLE:
             	InjectDllIntoForeground(MODE_CLEAR_CONSOLE);
@@ -180,7 +245,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			default:
 				return 0;
 			}
-			
+			return 0;
 		}
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -236,17 +301,20 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
 	    MessageBox(nullptr, (L"Error while opening foreground process: " + std::to_wstring(GetLastError())).c_str(), L"Error while opening process", MB_ICONERROR);
         return EXIT_FAILURE;
     }
-
+#ifdef RELEASE
     char payloadPath[MAX_PATH]{};
     GetFullPathNameA(payloadNameA, MAX_PATH, payloadPath, nullptr);
+#endif
 
-    // this is here because of visual studios stupid run environment
-//#ifndef _DEBUG
-//    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\consoleidator-injectable.dll)"};
-//#endif
-//#ifdef _DEBUG
-//    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\consoleidator-injectable.dll)"};
-//#endif
+	//this is here because of visual studios stupid run environment
+#ifndef RELEASE
+#ifndef _DEBUG
+    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\consoleidator-injectable.dll)"};
+#endif
+#ifdef _DEBUG
+    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\consoleidator-injectable.dll)"};
+#endif
+#endif
 
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)
@@ -310,7 +378,7 @@ HHOOK SetKeyboardHook()
 
     //get functions memory address
     HOOKPROC hookProc = reinterpret_cast<HOOKPROC>(GetProcAddress(hHookDll, "KeyboardProc"));
-    return SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hHookDll, 0);
+    return SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, hHookDll, NULL);
 }
 
 /*
