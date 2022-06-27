@@ -6,25 +6,6 @@
 HWND* parenthWndPointer;
 HWND parenthWnd;
 
-extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
-{
-	if (code == HC_ACTION)
-	{
-        const auto key = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
-        if (wParam == WM_KEYDOWN)
-        {
-	        for (int i = 0; i < sizeof registeredKeys / sizeof DWORD; ++i)
-	        {
-                if (registeredKeys[i] == key->vkCode)
-                {
-	                SendMessage(parenthWnd, WM_PROCESS_KEY, key->vkCode, 0);
-                }
-	        }
-        }
-	}
-    return CallNextHookEx(nullptr, code, wParam, lParam);
-}
-
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved

@@ -1,7 +1,27 @@
 #include "pch.h"
+#include "injectable-constants.hpp"
 #include <string>
-#include <cstdlib>
-#include "constants.hpp"
+
+Intent* mappedIntent;
+
+extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
+{
+	if (code == HC_ACTION)
+	{
+        const auto key = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
+        if (wParam == WM_KEYDOWN)
+        {
+	        for (int i = 0; i < sizeof registeredKeys / sizeof DWORD; ++i)
+	        {
+                if (registeredKeys[i] == key->vkCode)
+                {
+	                SendMessage(mappedIntent->hWnd, WM_PROCESS_KEY, key->vkCode, 0);
+                }
+	        }
+        }
+	}
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
 
 bool FillConsoleOutputAttributeAndSet(const HANDLE& hStdOut, const WORD& wAttributes, const DWORD& dwLength)
 {
@@ -150,6 +170,7 @@ bool ResetConsole(const HANDLE& hStdOut, const bool& invert = false)
 	return true;
 }
 
+
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved
@@ -164,7 +185,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     		HANDLE hMapFile = OpenFileMappingA(
 				FILE_MAP_ALL_ACCESS, 
 				FALSE, 
-				"Local\\InjectorMapFile"
+				"Local\\InjectableMap"
 			);
     		if (hMapFile == nullptr)
     		{
@@ -173,22 +194,24 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     			return FALSE;
     		}
 
-    		const auto lpuiMode = (unsigned int*)MapViewOfFile(
+    		mappedIntent = (Intent*)MapViewOfFile(
 				hMapFile,
 				FILE_MAP_ALL_ACCESS,
 				0,
 				0,
-				sizeof(HANDLE)
+				sizeof(Intent)
 			);
 
-    		if (lpuiMode == nullptr)
+    		if (mappedIntent == nullptr)
     		{
     			const std::wstring strError = L"Failed to map view of file: " + std::to_wstring(GetLastError());
     			WriteConsole(hStdOut, strError.c_str(), (DWORD)strError.size(), nullptr, nullptr);
                 return FALSE;
     		}
 
-            switch (*lpuiMode)
+			if (mappedIntent->loadIntent) return TRUE;
+
+            switch (mappedIntent->uiMode)
             {
 	            case MODE_CLEAR_CONSOLE:
 		            ClearConsole(hStdOut);

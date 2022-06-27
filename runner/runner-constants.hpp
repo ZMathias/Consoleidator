@@ -3,8 +3,6 @@
 // wparam constants for receiving the hotkey message
 constexpr UINT WM_PROCESS_KEY = WM_USER + 1;
 constexpr UINT WM_TRAYNOTIFY = WM_USER + 2;
-constexpr UINT ID__SHOW = WM_USER + 3;
-constexpr UINT ID__EXIT = WM_USER + 4;
 constexpr WPARAM HOTKEY_TOGGLE_SHOW = 1;
 constexpr WPARAM HOTKEY_CLEAR_CONSOLE = 2;
 constexpr WPARAM HOTKEY_MAXIMIZE_BUFFER = 3;
@@ -15,7 +13,7 @@ constexpr WPARAM HOTKEY_FOREGROUND_BACKWARD = 5;
 constexpr WPARAM HOTKEY_BACKGROUND_FORWARD = 6;
 constexpr WPARAM HOTKEY_BACKGROUND_BACKWARD = 7;
 
-// DLL hooking modes set in the mapped memory
+// DLL hooking modes set in the mapped memory, the uiMode should be one of these values
 constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
 constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
 constexpr unsigned int MODE_RESET = 7;
@@ -28,15 +26,13 @@ constexpr unsigned int CYCLE_BACKGROUND_BACKWARD = 6;
 constexpr wchar_t payloadNameW[] = L"consoleidator-injectable.dll";
 constexpr char payloadNameA[] = "consoleidator-injectable.dll";
 
-constexpr wchar_t hookDllNameW[] = L"consoleidator-hotkey.dll";
-constexpr char hookDllNameA[] = "consoleidator-hotkey.dll";
-
 struct Keycombo
 {
 	SHORT bitmask{};
     DWORD vkCode{};
 	WPARAM message;
 };
+
 
 constexpr int SHIFT_MOD = 0x1;
 constexpr int CONTROL_MOD = 0x2;
@@ -52,4 +48,11 @@ constexpr Keycombo registeredCombos[] = {
 	{CONTROL_MOD, VK_LEFT, HOTKEY_FOREGROUND_BACKWARD},
 	{CONTROL_MOD, VK_UP, HOTKEY_BACKGROUND_FORWARD},
 	{CONTROL_MOD, VK_DOWN, HOTKEY_BACKGROUND_BACKWARD},
+};
+
+struct Intent
+{
+	bool loadIntent{};
+	unsigned int uiMode{};
+	HWND hWnd;
 };

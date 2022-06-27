@@ -4,12 +4,11 @@
 #include "resource.h"
 #include "runner-constants.hpp"
 
-#define RELEASE
-
 NOTIFYICONDATA nid;
 bool isShowing{false};
 HMODULE payload_base{};
 HINSTANCE hInstance_;
+Intent* mappedIntent;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 WPARAM ConvertToMessage(WPARAM wParam);
@@ -17,8 +16,16 @@ HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL InjectDllIntoForeground(unsigned int uiMode);
 
+#define RELEASE
+
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
+#ifdef _DEBUG
+    #define _CRTDBG_MAP_ALLOC
+	#include <stdlib.h>
+	#include <crtdbg.h>
+	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
+#endif
     // Register the window class.
     constexpr wchar_t CLASS_NAME[]  = L"Consoleidator";
     
@@ -27,7 +34,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     wc.lpfnWndProc   = WindowProc;
     wc.hInstance     = hInstance;
     wc.lpszClassName = CLASS_NAME;
-    wc.hIcon         = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+    wc.hIcon         = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));	
 
     RegisterClass(&wc);
 
@@ -39,7 +46,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         WS_OVERLAPPEDWINDOW,           
         0, 0, 400, 200,
         nullptr,
-        nullptr,
+        LoadMenu(hInstance, MAKEINTRESOURCE(IDR_MENU1)),
         hInstance,
         nullptr
         );
@@ -57,8 +64,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         nullptr, 
         PAGE_READWRITE, 
         0, 
-        sizeof(HANDLE), 
-        "Local\\HotKeyParser"
+        sizeof Intent, 
+        "Local\\InjectableMap"
     );
 
     if (hMapFile == nullptr)
@@ -67,27 +74,25 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	    return false;
     }
 
-    const auto mappedhWnd = (HWND*)MapViewOfFile(
+    mappedIntent = (Intent*)MapViewOfFile(
         hMapFile,
 		FILE_MAP_WRITE,
 		0,
 		0,
-		sizeof(HWND)
+		sizeof(Intent)
     );
 
-    if (mappedhWnd == nullptr)
+    if (mappedIntent == nullptr)
     {
 	    MessageBox(nullptr, (L"Failed to map keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
 	    return false;
     }
 
-    *mappedhWnd = hWnd;
+    mappedIntent->loadIntent = true;
+    mappedIntent->hWnd = hWnd;
     hInstance_ = hInstance;
 
     if (SetKeyboardHook() == nullptr) return 0;
-
-    CloseHandle(hMapFile);
-    UnmapViewOfFile(mappedhWnd);
 
     // after all setup logic is done successfully, then load the tray icon
     if (!ToggleTray(hWnd, hInstance)) 
@@ -102,6 +107,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    // free up resources
+    CloseHandle(hMapFile);
+    UnmapViewOfFile(mappedIntent);
     return 0;
 }
 
@@ -147,6 +156,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_TRAYNOTIFY:
 		{
             if (lParam == 512) return 0;
+            if (lParam == WM_LBUTTONDBLCLK)
+            {
+	            isShowing = true;
+				ShowWindow(hWnd, SW_SHOW);
+                return 0;
+            }
+
 			if (lParam == WM_RBUTTONUP)
 			{
                 HMENU hMenu = CreatePopupMenu();
@@ -258,49 +274,20 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
     HWND hForeground = GetForegroundWindow();
     GetWindowThreadProcessId(hForeground, &process_id);
 
-    HANDLE hMapFile = CreateFileMappingA(
-        INVALID_HANDLE_VALUE,
-		nullptr,
-		PAGE_READWRITE,
-		0,
-		sizeof(unsigned int),
-		"Local\\InjectorMapFile"
-        );
-
-    if (hMapFile == nullptr)
-	{
-        MessageBox(nullptr, (L"Failed to create file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-		return EXIT_FAILURE;
-	}
-
-    const auto lpuiCallMode = (unsigned int*)MapViewOfFile(
-        hMapFile,
-		FILE_MAP_ALL_ACCESS,
-		0,
-		0,
-		sizeof(unsigned int)
-    );
-
-
-    if (lpuiCallMode == nullptr)
-    {
-	    MessageBox(nullptr, (L"Failed to map view of file" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-        return EXIT_FAILURE;
-    }
-
     HANDLE hProcess = OpenProcess(
         PROCESS_ALL_ACCESS,
         FALSE,
         process_id
     );
-
-    *lpuiCallMode = uiMode;
+    mappedIntent->loadIntent = false;
+    mappedIntent->uiMode = uiMode;
 
     if (hProcess == nullptr)
     {
 	    MessageBox(nullptr, (L"Error while opening foreground process: " + std::to_wstring(GetLastError())).c_str(), L"Error while opening process", MB_ICONERROR);
         return EXIT_FAILURE;
     }
+	
 #ifdef RELEASE
     char payloadPath[MAX_PATH]{};
     GetFullPathNameA(payloadNameA, MAX_PATH, payloadPath, nullptr);
@@ -358,11 +345,9 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
         MessageBox(nullptr, (L"Error while freeing memory in remote process: " + std::to_wstring(GetLastError())).c_str(), L"Error while freeing memory", MB_ICONERROR);
 	    return EXIT_FAILURE;
     }
-
-    UnmapViewOfFile(hMapFile);
+	
     CloseHandle(hThread);
     CloseHandle(hProcess);
-    CloseHandle(hMapFile);
     return EXIT_SUCCESS;
 }
 
@@ -372,7 +357,7 @@ HHOOK SetKeyboardHook()
     static HINSTANCE hHookDll{};
 
     //load KeyboardProc dll
-    hHookDll = LoadLibrary(hookDllNameW);
+    hHookDll = LoadLibrary(payloadNameW);
     if (hHookDll == nullptr)
 		return nullptr;
 
