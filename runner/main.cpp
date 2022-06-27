@@ -4,7 +4,7 @@
 #include "resource.h"
 #include "runner-constants.hpp"
 
-//#define RELEASE
+#define RELEASE
 
 NOTIFYICONDATA nid;
 bool isShowing{false};
