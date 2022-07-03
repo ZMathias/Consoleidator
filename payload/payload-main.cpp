@@ -15,6 +15,8 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 	        {
                 if (registeredKeys[i] == key->vkCode)
                 {
+					// the intent structure also contains the HWND for our main window
+					// this allows us to send messages for processing in nice fashion
 	                SendMessage(mappedIntent->hWnd, WM_PROCESS_KEY, key->vkCode, 0);
                 }
 	        }

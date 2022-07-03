@@ -4,6 +4,9 @@
 #include "resource.h"
 #include "runner-constants.hpp"
 
+HWND hWndTitle{};
+HWND hWndEdit{};
+
 NOTIFYICONDATA nid;
 bool isShowing{false};
 HMODULE payload_base{};
@@ -11,13 +14,15 @@ HINSTANCE hInstance_;
 Intent* mappedIntent;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 WPARAM ConvertToMessage(WPARAM wParam);
 HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL InjectDllIntoForeground(unsigned int uiMode);
+BOOL ShowTitleSetter();
 
 // used to set correct dll paths for the payload
-#define RELEASE
+//#define RELEASE
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -133,14 +138,82 @@ BOOL ToggleTray(HWND hWnd, HINSTANCE hInstance)
     return Shell_NotifyIcon(NIM_DELETE, &nid);
 }
 
-
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch (uMsg)
 	{
+	case WM_CREATE:
+		{
+			WNDCLASS wnd{};
+
+		    constexpr wchar_t CLASS_NAME[] = L"Consoleidator title setter";
+		    
+		    wnd.hInstance = hInstance_;
+		    wnd.hIcon = LoadIcon(hInstance_, MAKEINTRESOURCE(IDI_ICON1));
+		    wnd.lpszClassName = CLASS_NAME;
+		    wnd.lpfnWndProc = WindowProcTitle;
+		    wnd.style = CS_HREDRAW | CS_VREDRAW;
+		    wnd.hbrBackground = CreateSolidBrush(0x2b2b2b);
+
+		    if (RegisterClass(&wnd) == NULL)
+		    {
+			    MessageBox(nullptr, L"Failed to register title setter window class!", L"Error", MB_ICONERROR);
+		        return 0;
+		    }
+
+		    hWndTitle = CreateWindowEx(
+		        WS_EX_TOOLWINDOW,
+		        CLASS_NAME,
+		        CLASS_NAME,
+		        0,
+		        CW_USEDEFAULT,
+		        CW_USEDEFAULT,
+		        350,
+		        28,
+		        nullptr,
+		        nullptr,
+		        nullptr,
+		        nullptr
+		        );
+
+		    if (hWndTitle == nullptr)
+		    {
+			    MessageBox(nullptr, L"Failed to create title setter window", L"Error", MB_ICONERROR);
+		        return 0;
+		    }
+
+		    // hack to remove the title bar
+		    SetWindowLongPtr(hWndTitle, GWL_STYLE, 0);
+
+		    hWndEdit = CreateWindow(
+		        L"EDIT",
+		        L"",
+		        WS_CHILD | WS_BORDER | WS_VISIBLE | ES_LEFT,
+		        0, 2,
+		        350, 24,
+		        hWndTitle,
+		        nullptr,
+		        nullptr,
+		        nullptr
+		        );
+
+				// initialize NONCLIENTMETRICS structure
+				NONCLIENTMETRICS ncm;
+				ncm.cbSize = sizeof(ncm);
+
+				// obtain non-client metrics for the default system font
+				SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
+
+				// create the new font
+				HFONT hNewFont = CreateFontIndirect(&ncm.lfMessageFont);
+
+				// set the new font
+				SendMessage(hWndEdit, WM_SETFONT, (WPARAM)hNewFont, 0);
+			return 0;
+		}
 	case WM_CLOSE:
-		AnimateWindow(hWnd, 100, AW_HIDE | AW_VER_POSITIVE | AW_SLIDE | AW_HOR_POSITIVE);
         isShowing = false;
+        ShowWindow(hWnd, SW_HIDE);
 		ToggleTray(hWnd, hInstance_);
         return 0;		
 	case WM_DESTROY:
@@ -228,6 +301,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     isShowing = true;
 	                ShowWindow(hWnd, SW_SHOW);
                     ToggleTray(hWnd, hInstance_);
+                    SetForegroundWindow(hWnd);
                 }
 				else 
                 {
@@ -260,6 +334,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			case HOTKEY_BACKGROUND_BACKWARD:
 				InjectDllIntoForeground(CYCLE_BACKGROUND_BACKWARD);
 				return 0;
+			case HOTKEY_SET_TITLE:
+                ShowTitleSetter();
 			default:
 				return 0;
 			}
@@ -267,6 +343,23 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	}
+}
+
+LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	switch(uMsg)
+	{
+    case WM_PAINT:
+	{
+		PAINTSTRUCT ps;
+		HDC hdc = BeginPaint(hWnd, &ps);
+		FillRect(hdc, &ps.rcPaint, CreateSolidBrush(0x2b2b2b));
+		EndPaint(hWnd, &ps);
+	    return 0;
+	}
+	default:
+        return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
 }
 
@@ -353,7 +446,20 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
     return EXIT_SUCCESS;
 }
 
-// returns nullptr if failed
+BOOL ShowTitleSetter()
+{
+    HWND hWndForeground = GetForegroundWindow();
+    RECT anchor{};
+    GetWindowRect(hWndForeground, &anchor);
+
+    SetWindowPos(hWndTitle, HWND_TOPMOST, anchor.left + 35, anchor.top + 2, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
+    //SetForegroundWindow(hWndTitle);
+    SetFocus(hWndTitle);
+	return TRUE;
+}
+
+
+// Sets the low-level keyboard hook defined in consoleidator-injectable/payload-main.cpp
 HHOOK SetKeyboardHook()
 {
     static HINSTANCE hHookDll{};
@@ -376,6 +482,7 @@ HHOOK SetKeyboardHook()
  *      // CONTROL - second bit (0x0002)
  *      // ALT - third bit (0x0004)
 */
+// TODO: port to the Windows.h defined modifier macros
 WPARAM ConvertToMessage(WPARAM wParam)
 {
     SHORT bitmask{};
