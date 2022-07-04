@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <CommCtrl.h>
 #include <cstdio>
 #include <string>
 #include "resource.h"
@@ -15,14 +16,15 @@ Intent* mappedIntent;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubClass, DWORD_PTR dwRefData);
 WPARAM ConvertToMessage(WPARAM wParam);
 HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
-BOOL InjectDllIntoForeground(unsigned int uiMode);
+BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t* optArg = nullptr);
 BOOL ShowTitleSetter();
 
 // used to set correct dll paths for the payload
-//#define RELEASE
+#define RELEASE
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -169,7 +171,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		        CW_USEDEFAULT,
 		        CW_USEDEFAULT,
 		        350,
-		        28,
+		        20,
 		        nullptr,
 		        nullptr,
 		        nullptr,
@@ -185,30 +187,39 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		    // hack to remove the title bar
 		    SetWindowLongPtr(hWndTitle, GWL_STYLE, 0);
 
-		    hWndEdit = CreateWindow(
+		    hWndEdit = CreateWindow
+			(
 		        L"EDIT",
 		        L"",
 		        WS_CHILD | WS_BORDER | WS_VISIBLE | ES_LEFT,
-		        0, 2,
-		        350, 24,
+		        0, 0,
+		        350, 20,
 		        hWndTitle,
 		        nullptr,
 		        nullptr,
 		        nullptr
 		        );
 
-				// initialize NONCLIENTMETRICS structure
-				NONCLIENTMETRICS ncm;
-				ncm.cbSize = sizeof(ncm);
+			// initialize NONCLIENTMETRICS structure
+			NONCLIENTMETRICS ncm;
+			ncm.cbSize = sizeof(ncm);
 
-				// obtain non-client metrics for the default system font
-				SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
+			// obtain non-client metrics for the default system font
+			SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
 
-				// create the new font
-				HFONT hNewFont = CreateFontIndirect(&ncm.lfMessageFont);
+			// create the new font
+			HFONT hNewFont = CreateFontIndirect(&ncm.lfMessageFont);
 
-				// set the new font
-				SendMessage(hWndEdit, WM_SETFONT, (WPARAM)hNewFont, 0);
+			// set the new font
+			SendMessage(hWndEdit, WM_SETFONT, (WPARAM)hNewFont, 0);
+
+			// subclass the edit control
+			if (SetWindowSubclass(hWndEdit, EditSubclassProc, 0, 0) == 0)
+			{
+				MessageBox(nullptr, L"Failed to subclass edit control", L"Error", MB_ICONERROR);
+				return 0;
+			}
+
 			return 0;
 		}
 	case WM_CLOSE:
@@ -335,7 +346,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				InjectDllIntoForeground(CYCLE_BACKGROUND_BACKWARD);
 				return 0;
 			case HOTKEY_SET_TITLE:
+				// this shows the title setting window at the foreground title bar
+				// the injection event is handled when the user presses return
                 ShowTitleSetter();
+				return 0;
 			default:
 				return 0;
 			}
@@ -344,6 +358,37 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
+}
+
+LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubClass, DWORD_PTR dwRefData)
+{
+	switch (uMsg)
+	{
+	case WM_KEYUP:
+		{
+			switch (wParam)
+			{
+			case VK_RETURN:
+				{
+					wchar_t str[MAX_PATH * 4]{};
+					GetWindowTextW(hWndEdit, str, MAX_PATH * 4);
+					ShowWindow(hWndTitle, SW_HIDE);
+					InjectDllIntoForeground(MODE_SET_TITLE, str);
+					return 0;
+				}
+			default:
+				return 0;
+			}
+		}
+	case WM_KEYDOWN:
+		if (wParam == VK_ESCAPE)
+		{
+			ShowWindow(hWndTitle, SW_HIDE);
+			return 0;
+		}
+	default:
+		return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+	}	
 }
 
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -358,12 +403,24 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		EndPaint(hWnd, &ps);
 	    return 0;
 	}
+	case WM_CTLCOLOREDIT:
+	    {
+			SetBkColor((HDC)wParam, RGB(43, 43, 43));
+			SetTextColor((HDC)wParam, RGB(255, 255, 255));
+			return (LPARAM)CreateSolidBrush(0x2b2b2b);
+	    }
+	case WM_COMMAND:
+    {
+	    if (HIWORD(wParam) == EN_KILLFOCUS)
+			ShowWindow(hWndTitle, SW_HIDE);
+		return 0;
+    }
 	default:
         return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
 }
 
-BOOL InjectDllIntoForeground(unsigned int uiMode)
+BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
 {
     DWORD process_id{};
     HWND hForeground = GetForegroundWindow();
@@ -376,6 +433,7 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
     );
     mappedIntent->loadIntent = false;
     mappedIntent->uiMode = uiMode;
+	if (optArg != nullptr) wcscpy_s(mappedIntent->title, optArg);
 
     if (hProcess == nullptr)
     {
@@ -448,13 +506,35 @@ BOOL InjectDllIntoForeground(unsigned int uiMode)
 
 BOOL ShowTitleSetter()
 {
-    HWND hWndForeground = GetForegroundWindow();
     RECT anchor{};
+	wchar_t title[MAX_PATH * 4]{};
+
+	// retrieve the handle to the foreground window
+    HWND hWndForeground = GetForegroundWindow();
+
+	// retrieve anchor position 
     GetWindowRect(hWndForeground, &anchor);
 
-    SetWindowPos(hWndTitle, HWND_TOPMOST, anchor.left + 35, anchor.top + 2, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
-    //SetForegroundWindow(hWndTitle);
-    SetFocus(hWndTitle);
+	// retrieve the actual window title of the target foreground window and append it to the control
+	GetWindowTextW(hWndForeground, title, MAX_PATH * 4);
+	SetWindowTextW(hWndEdit, title);
+
+	const WPARAM len = wcslen(title);
+
+	SendMessage(hWndEdit, EM_SETSEL, len, len);
+
+	// fixes a problem where the edit control doesnt get focus when the cmd is opened from the taskbar
+	SetForegroundWindow(hWndForeground);
+
+	// show the actual edit window in title bar
+    SetWindowPos(hWndTitle, HWND_TOPMOST, anchor.left + 32, anchor.top + 2, anchor.right - anchor.left - 185, 28, SWP_SHOWWINDOW);
+	SetWindowPos(hWndEdit, nullptr, 0, 4, anchor.right - anchor.left - 4, 24, SWP_NOZORDER);
+
+	// set keyboard focus to edit control
+    SetForegroundWindow(hWndTitle);
+	SetFocus(hWndTitle);
+    SetFocus(hWndEdit);
+
 	return TRUE;
 }
 

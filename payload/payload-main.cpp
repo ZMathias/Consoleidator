@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "injectable-constants.hpp"
 #include <string>
+#include "injectable-constants.hpp"
 
 Intent* mappedIntent;
 
@@ -238,6 +238,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 					break;
 				case CYCLE_BACKGROUND_BACKWARD:
 					CycleBackground(hStdOut, false);
+					break;
+	            case MODE_SET_TITLE:
+					SetConsoleTitle(mappedIntent->title);
 					break;
     		default:
 				break;

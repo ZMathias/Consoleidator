@@ -64,4 +64,5 @@ struct Intent
 	bool loadIntent{};
 	unsigned int uiMode{};
 	HWND hWnd;
+	wchar_t title[MAX_PATH]{};
 };
