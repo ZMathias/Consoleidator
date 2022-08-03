@@ -5,6 +5,3 @@
 - Maximizing or changing the console buffer size.
 - Quickly erasing the contents of the command-line, even while it's being written to or when the prompt is unavailable. This is also triggered by a shortcut.
 - Setting the title of the window.
-
-##
-Doesn't yet work with Windows Terminal, though that will be fixed soon.
