@@ -1,13 +1,19 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
 #include <Windows.h>
 #include <CommCtrl.h>
 #include <cstdio>
 #include <string>
+#include "Updater.hpp"
 #include "resource.h"
 #include "runner-constants.hpp"
 
 HWND hWndTitle{};
 HWND hWndEdit{};
 
+std::wstring WorkingDirectoryW{};
+std::string WorkingDirectoryA{};
 NOTIFYICONDATA nid;
 bool isShowing{false};
 HMODULE payload_base{};
@@ -23,8 +29,16 @@ BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t* optArg = nullptr);
 BOOL ShowTitleSetter();
 
-// used to set correct dll paths for the payload
-#define RELEASE
+std::string to_ascii(const std::wstring& str)
+{
+	std::string ret;
+	ret.reserve(str.length());
+	for (const auto& c : str)
+	{
+		ret += static_cast<char>(c);
+	}
+	return ret;
+}
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -34,6 +48,11 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	#include <crtdbg.h>
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
+	
+	const Updater updater("v0.4.0");
+	WorkingDirectoryW = updater.ImageDirectory;
+	WorkingDirectoryA = to_ascii(WorkingDirectoryW);
+
     // Register the window class.
     constexpr wchar_t CLASS_NAME[]  = L"Consoleidator";
     
@@ -50,7 +69,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     HWND hWnd = CreateWindowEx(
         0,                             
         CLASS_NAME,                    
-        L" ",
+        L"Consoleidator",
         WS_OVERLAPPEDWINDOW,           
         275, 150, 400, 200,
         nullptr,
@@ -79,7 +98,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (hMapFile == nullptr)
     {
         MessageBox(nullptr, (L"Failed to create keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-	    return false;
+	    return 0;
     }
 
     mappedIntent = (Intent*)MapViewOfFile(
@@ -93,7 +112,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (mappedIntent == nullptr)
     {
 	    MessageBox(nullptr, (L"Failed to map keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-	    return false;
+	    return 0;
     }
 
     mappedIntent->loadIntent = true;
@@ -271,10 +290,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				mii.cch = sizeof szExit;
 
 				InsertMenuItem(hMenu, ID__EXIT, FALSE, &mii);
-				SetMenuDefaultItem(hMenu, ID__SHOW, false);
+				SetMenuDefaultItem(hMenu, ID__SHOW, FALSE);
                 POINT cursor{};
 				GetCursorPos(&cursor);
-                SetForegroundWindow(hWnd); // a hack to make the menu disappear when the mouse is clicked outside of it, windows requires it
+                SetForegroundWindow(hWnd); // a hack to make the menu disappear when the mouse is clicked outside it, windows requires it
 				if (TrackPopupMenuEx(hMenu, TPM_LEFTALIGN, cursor.x, cursor.y,hWnd, nullptr) == 0)
 				{
 					MessageBox(hWnd, (L"Failed to show menu: " + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
@@ -355,6 +374,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			return 0;
 		}
+	case WM_USER_UPDATE_COMPLETE:
+		{
+			MessageBoxW(hWnd, L"Update was completed successfully!", L"Update successful", MB_ICONINFORMATION);
+			return 0;
+		}
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
@@ -412,7 +436,11 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	case WM_COMMAND:
     {
 	    if (HIWORD(wParam) == EN_KILLFOCUS)
+	    {
+		    ShowWindow(hWndEdit, SW_HIDE);
 			ShowWindow(hWndTitle, SW_HIDE);
+			return 0;
+	    }
 		return 0;
     }
 	default:
@@ -420,6 +448,7 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	}
 }
 
+// optional argument used to transfer title to the dll
 BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
 {
     DWORD process_id{};
@@ -433,6 +462,8 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
     );
     mappedIntent->loadIntent = false;
     mappedIntent->uiMode = uiMode;
+
+	// copy title to dll if available
 	if (optArg != nullptr) wcscpy_s(mappedIntent->title, optArg);
 
     if (hProcess == nullptr)
@@ -440,26 +471,16 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
 	    MessageBox(nullptr, (L"Error while opening foreground process: " + std::to_wstring(GetLastError())).c_str(), L"Error while opening process", MB_ICONERROR);
         return EXIT_FAILURE;
     }
-	
-#ifdef RELEASE
-    char payloadPath[MAX_PATH]{};
-    GetFullPathNameA(payloadNameA, MAX_PATH, payloadPath, nullptr);
-#endif
 
-	//this is here because of visual studios stupid run environment
-#ifndef RELEASE
-#ifndef _DEBUG
-    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Release\consoleidator-injectable.dll)"};
-#endif
-#ifdef _DEBUG
-    char payloadPath[MAX_PATH]{R"(F:\prj\C++\ConsoleUtilSuite\x64\Debug\consoleidator-injectable.dll)"};
-#endif
-#endif
+    char payloadPath[MAX_PATH]{};
+	memcpy(payloadPath, WorkingDirectoryA.data(), WorkingDirectoryA.size());
+    memcpy(payloadPath + WorkingDirectoryA.size(), payloadNameA, __builtin_strlen(payloadNameA));
 
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)
     {
 	    MessageBox(nullptr, (L"Error while allocating memory in remote process: " + std::to_wstring(GetLastError())).c_str(), L"Error while allocating in remote", MB_ICONERROR);
+		CloseHandle(hProcess);
         return EXIT_FAILURE;
     }
 
@@ -467,15 +488,21 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
     if (hKernel32 == nullptr)
     {
         MessageBox(nullptr, (L"Error while getting module handle of kernel32.dll: " + std::to_wstring(GetLastError())).c_str(), L"Error while getting module handle", MB_ICONERROR);
+		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
 
-    const BOOL result = WriteProcessMemory(hProcess, lib_remote, payloadPath, __builtin_strlen(payloadPath), nullptr);
+	size_t written{};
+
+    const BOOL result = WriteProcessMemory(hProcess, lib_remote, payloadPath, __builtin_strlen(payloadPath), &written);
     if (result == FALSE)
     {
     	MessageBox(nullptr, (L"Error while writing to process memory of foreground window: " + std::to_wstring(GetLastError())).c_str(), L"Error while writing to process", MB_ICONERROR);
+		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
+
+	assert(written == __builtin_strlen(payloadPath));
 
 	HANDLE hThread = CreateRemoteThread(
         hProcess, 
@@ -489,12 +516,15 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
 
     if (hThread == nullptr)
 	{
+		CloseHandle(hProcess);
     	MessageBox(nullptr, (L"Error while creating remote thread: " + std::to_wstring(GetLastError())).c_str(), L"Error while creating thread", MB_ICONERROR);
 	    return EXIT_FAILURE;
 	}
 
     WaitForSingleObject(hThread, INFINITE);
-    if (!VirtualFreeEx(hProcess, lib_remote, 0, MEM_RELEASE)) {
+    if (!VirtualFreeEx(hProcess, lib_remote, 0, MEM_RELEASE))
+	{
+		CloseHandle(hProcess);
         MessageBox(nullptr, (L"Error while freeing memory in remote process: " + std::to_wstring(GetLastError())).c_str(), L"Error while freeing memory", MB_ICONERROR);
 	    return EXIT_FAILURE;
     }
@@ -523,18 +553,21 @@ BOOL ShowTitleSetter()
 
 	SendMessage(hWndEdit, EM_SETSEL, len, len);
 
-	// fixes a problem where the edit control doesnt get focus when the cmd is opened from the taskbar
-	SetForegroundWindow(hWndForeground);
-
 	// show the actual edit window in title bar
     SetWindowPos(hWndTitle, HWND_TOPMOST, anchor.left + 32, anchor.top + 2, anchor.right - anchor.left - 185, 28, SWP_SHOWWINDOW);
-	SetWindowPos(hWndEdit, nullptr, 0, 4, anchor.right - anchor.left - 4, 24, SWP_NOZORDER);
+	SetWindowPos(hWndEdit, nullptr, 0, 4, anchor.right - anchor.left - 4, 24, SWP_NOZORDER | SWP_SHOWWINDOW);
 
 	// set keyboard focus to edit control
-    SetForegroundWindow(hWndTitle);
-	SetFocus(hWndTitle);
-    SetFocus(hWndEdit);
-
+    if (SetFocus(hWndTitle) == nullptr)
+    {
+	    MessageBox(nullptr, (L"Cannot set foreground, error: " + std::to_wstring(GetLastError())).c_str(), L"Error while setting foreground", MB_ICONERROR);
+		return EXIT_FAILURE;
+    }
+	if (SetFocus(hWndEdit) == nullptr)
+	{
+	    MessageBox(nullptr, L"Error while setting focus to edit control", L"Error while setting focus", MB_ICONERROR);
+		return EXIT_FAILURE;
+	}
 	return TRUE;
 }
 
@@ -545,7 +578,7 @@ HHOOK SetKeyboardHook()
     static HINSTANCE hHookDll{};
 
     //load KeyboardProc dll
-    hHookDll = LoadLibrary(payloadNameW);
+    hHookDll = LoadLibraryW(payloadNameW);
     if (hHookDll == nullptr)
 		return nullptr;
 
@@ -573,7 +606,7 @@ WPARAM ConvertToMessage(WPARAM wParam)
     if (bitmask == 0) return 0;
 	for (int i = 0; i < sizeof registeredCombos / sizeof Keycombo; ++i)
 	{
-		if (wParam == registeredCombos[i].vkCode && bitmask == registeredCombos[i].bitmask)
+		if (wParam == (WPARAM)registeredCombos[i].vkCode && bitmask == registeredCombos[i].bitmask)
 			return registeredCombos[i].message;
 	}
     return 0;

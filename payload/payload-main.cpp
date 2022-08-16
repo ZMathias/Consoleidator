@@ -1,3 +1,6 @@
+// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
 #include "pch.h"
 #include <string>
 #include "injectable-constants.hpp"
@@ -6,7 +9,7 @@ Intent* mappedIntent;
 
 extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
 {
-	if (code == HC_ACTION)
+ 	if (code == HC_ACTION)
 	{
         const auto key = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
         if (wParam == WM_KEYDOWN)
@@ -17,7 +20,7 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
                 {
 					// the intent structure also contains the HWND for our main window
 					// this allows us to send messages for processing in nice fashion
-	                SendMessage(mappedIntent->hWnd, WM_PROCESS_KEY, key->vkCode, 0);
+	                SendMessage(mappedIntent->hWnd, WM_PROCESS_KEY, (WPARAM)key->vkCode, 0);
                 }
 	        }
         }
@@ -25,7 +28,7 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
     return CallNextHookEx(nullptr, code, wParam, lParam);
 }
 
-bool FillConsoleOutputAttributeAndSet(const HANDLE& hStdOut, const WORD& wAttributes, const DWORD& dwLength)
+bool FillConsoleOutputAttributeAndSet(HANDLE hStdOut, WORD wAttributes, DWORD dwLength)
 {
 	constexpr COORD beginning{0, 0};
 	DWORD charsWritten{};
@@ -34,7 +37,7 @@ bool FillConsoleOutputAttributeAndSet(const HANDLE& hStdOut, const WORD& wAttrib
 	return true;	
 }
 
-bool MaximizeConsoleBuffer(const HANDLE& hStdOut)
+bool MaximizeConsoleBuffer(HANDLE hStdOut)
 {
 	
 	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
@@ -54,7 +57,7 @@ bool MaximizeConsoleBuffer(const HANDLE& hStdOut)
 	return true;
 }
 
-bool ClearConsole(const HANDLE& hStdOut)
+bool ClearConsole(HANDLE hStdOut)
 {
 	// Fetch existing console mode so we correctly add a flag and not turn off others
     DWORD mode = 0;
@@ -92,7 +95,7 @@ bool ClearConsole(const HANDLE& hStdOut)
 	return EXIT_SUCCESS;
 }
 
-bool CycleForeground(const HANDLE& hStdOut, const bool forward)
+bool CycleForeground(HANDLE hStdOut, const bool forward)
 {
 	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
 	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
@@ -127,7 +130,7 @@ bool CycleForeground(const HANDLE& hStdOut, const bool forward)
 	return true;
 }
 
-bool CycleBackground(const HANDLE& hStdOut, const bool forward)
+bool CycleBackground(const HANDLE hStdOut, const bool forward)
 {
 	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
 	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
@@ -163,7 +166,7 @@ bool CycleBackground(const HANDLE& hStdOut, const bool forward)
 	}
 }
 
-bool ResetConsole(const HANDLE& hStdOut, const bool& invert = false)
+bool ResetConsole(HANDLE hStdOut, const bool invert = false)
 {
 	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
 	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
