@@ -1,13 +1,23 @@
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
 #include "Updater.hpp"
+
+int Updater::GetMajorWindowsVersion() const
+{
+	DWORD size{ MAX_PATH };
+	char* buff = new char[size] {};
+	LSTATUS errorCode{};
+	errorCode = RegGetValueA(HKEY_LOCAL_MACHINE, R"(SOFTWARE\Microsoft\Windows NT\CurrentVersion)", "CurrentBuildNumber", RRF_RT_REG_SZ | RRF_RT_REG_QWORD | RRF_RT_REG_DWORD, nullptr, buff, &size);
+	if (errorCode != ERROR_SUCCESS)
+		return -1;
+	return std::atoi(buff);
+}
 
 std::vector<char> Updater::MakeRequest(const std::string& url) const
 {
 	constexpr DWORD buffer_size = 100000;
 	HINTERNET hInternet = InternetOpenA(
-		"Consoleidator/3.5.0",
+		"Consoleidator",
 		INTERNET_OPEN_TYPE_DIRECT, 
 		nullptr, 
 		nullptr,

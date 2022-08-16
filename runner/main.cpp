@@ -9,9 +9,12 @@
 #include "resource.h"
 #include "runner-constants.hpp"
 
+#define WIN11_BUILD 22000
+
 HWND hWndTitle{};
 HWND hWndEdit{};
 
+int buildNumber{};
 std::wstring WorkingDirectoryW{};
 std::string WorkingDirectoryA{};
 NOTIFYICONDATA nid;
@@ -19,6 +22,7 @@ bool isShowing{false};
 HMODULE payload_base{};
 HINSTANCE hInstance_;
 Intent* mappedIntent;
+
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -28,17 +32,7 @@ HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t* optArg = nullptr);
 BOOL ShowTitleSetter();
-
-std::string to_ascii(const std::wstring& str)
-{
-	std::string ret;
-	ret.reserve(str.length());
-	for (const auto& c : str)
-	{
-		ret += static_cast<char>(c);
-	}
-	return ret;
-}
+std::string to_ascii(const std::wstring& str);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -49,10 +43,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.4.0");
+	const Updater updater("v0.4.2");
 	WorkingDirectoryW = updater.ImageDirectory;
 	WorkingDirectoryA = to_ascii(WorkingDirectoryW);
-
+	buildNumber = updater.GetMajorWindowsVersion();
     // Register the window class.
     constexpr wchar_t CLASS_NAME[]  = L"Consoleidator";
     
@@ -83,7 +77,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         return 0;
     }
 
-    ShowWindow(hWnd, nCmdShow);
     ShowWindow(hWnd, SW_HIDE);
 
     HANDLE hMapFile = CreateFileMappingA(
@@ -141,6 +134,17 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     return 0;
 }
 
+std::string to_ascii(const std::wstring& str)
+{
+	std::string ret;
+	ret.reserve(str.length());
+	for (const auto& c : str)
+	{
+		ret += static_cast<char>(c);
+	}
+	return ret;
+}
+
 BOOL ToggleTray(HWND hWnd, HINSTANCE hInstance)
 {
     if (!isShowing)
@@ -174,7 +178,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		    wnd.lpszClassName = CLASS_NAME;
 		    wnd.lpfnWndProc = WindowProcTitle;
 		    wnd.style = CS_HREDRAW | CS_VREDRAW;
-		    wnd.hbrBackground = CreateSolidBrush(0x2b2b2b);
+		    wnd.hbrBackground = CreateSolidBrush(buildNumber > WIN11_BUILD ? 0x2b2b2b : 0xffffff);
 
 		    if (RegisterClass(&wnd) == NULL)
 		    {
@@ -423,15 +427,15 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	{
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hWnd, &ps);
-		FillRect(hdc, &ps.rcPaint, CreateSolidBrush(0x2b2b2b));
+		FillRect(hdc, &ps.rcPaint, CreateSolidBrush(buildNumber > WIN11_BUILD ? 0x2b2b2b : 0xffffff));
 		EndPaint(hWnd, &ps);
 	    return 0;
 	}
 	case WM_CTLCOLOREDIT:
 	    {
-			SetBkColor((HDC)wParam, RGB(43, 43, 43));
-			SetTextColor((HDC)wParam, RGB(255, 255, 255));
-			return (LPARAM)CreateSolidBrush(0x2b2b2b);
+			SetBkColor((HDC)wParam, buildNumber > WIN11_BUILD ? RGB(43, 43, 43) : RGB(255, 255, 255));
+			SetTextColor((HDC)wParam, buildNumber > WIN11_BUILD ? RGB(255, 255, 255) : RGB(0, 0, 0));
+			return (LPARAM)CreateSolidBrush(buildNumber > WIN11_BUILD ? 0x2b2b2b : 0xffffff);
 	    }
 	case WM_COMMAND:
     {
