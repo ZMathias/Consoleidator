@@ -19,6 +19,7 @@ constexpr WPARAM HOTKEY_BACKGROUND_BACKWARD = 7;
 constexpr WPARAM HOTKEY_RESET = 8;
 constexpr WPARAM HOTKEY_RESET_INVERT = 9;
 constexpr WPARAM HOTKEY_SET_TITLE = 10;
+constexpr WPARAM HOTKEY_HELP = 11;
 
 // DLL hooking modes set in the mapped memory, the uiMode should be one of these values
 constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
@@ -30,6 +31,7 @@ constexpr unsigned int CYCLE_BACKGROUND_BACKWARD = 6;
 constexpr unsigned int MODE_RESET = 7;
 constexpr unsigned int MODE_RESET_INVERT = 8;
 constexpr unsigned int MODE_SET_TITLE = 9;
+constexpr unsigned int MODE_HELP = 10;
 
 constexpr wchar_t payloadNameW[] = L"consoleidator-injectable.dll";
 constexpr char payloadNameA[] = "consoleidator-injectable.dll";
@@ -47,20 +49,26 @@ constexpr int SHIFT_MOD = 0x1;
 constexpr int CONTROL_MOD = 0x2;
 constexpr int ALT_MOD = 0x4;
 
-
+// 0x4D is the ASCII code for the 'M' key
+// 0x54 is the ASCII code for the 'T' key
+// 0x48 is the ASCII code for the 'H' key
+constexpr DWORD VK_M = 0x4D;
+constexpr DWORD VK_T = 0x54;
+constexpr DWORD VK_H = 0x48;
 
 // the message loop uses this table to look for a matching bitmask and key combination
 constexpr Keycombo registeredCombos[] = {
 	{CONTROL_MOD | SHIFT_MOD | ALT_MOD, VK_F5, HOTKEY_TOGGLE_SHOW},
 	{CONTROL_MOD | SHIFT_MOD, VK_DELETE, HOTKEY_CLEAR_CONSOLE},
-	{CONTROL_MOD | SHIFT_MOD, 0x4D, HOTKEY_MAXIMIZE_BUFFER},
+	{CONTROL_MOD | SHIFT_MOD, VK_M, HOTKEY_MAXIMIZE_BUFFER},
 	{CONTROL_MOD, VK_HOME, HOTKEY_RESET_INVERT},
 	{CONTROL_MOD, VK_END, HOTKEY_RESET},
 	{CONTROL_MOD, VK_RIGHT, HOTKEY_FOREGROUND_FORWARD},
 	{CONTROL_MOD, VK_LEFT, HOTKEY_FOREGROUND_BACKWARD},
 	{CONTROL_MOD, VK_UP, HOTKEY_BACKGROUND_FORWARD},
 	{CONTROL_MOD, VK_DOWN, HOTKEY_BACKGROUND_BACKWARD},
-	{CONTROL_MOD | SHIFT_MOD, 0x54, HOTKEY_SET_TITLE}
+	{CONTROL_MOD | SHIFT_MOD, VK_T, HOTKEY_SET_TITLE},
+	{CONTROL_MOD | SHIFT_MOD, VK_H, HOTKEY_HELP},
 };
 
 struct Intent

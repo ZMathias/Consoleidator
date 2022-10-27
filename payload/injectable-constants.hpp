@@ -18,6 +18,7 @@ constexpr unsigned int CYCLE_BACKGROUND_BACKWARD = 6;
 constexpr unsigned int MODE_RESET = 7;
 constexpr unsigned int MODE_RESET_INVERT = 8;
 constexpr unsigned int MODE_SET_TITLE = 9;
+constexpr unsigned int MODE_HELP = 10;
 
 // wparam constants for receiving the hotkey message
 constexpr UINT WM_PROCESS_KEY = WM_USER + 1;
@@ -26,8 +27,9 @@ constexpr UINT WM_PROCESS_KEY = WM_USER + 1;
 // 0x54 is the ASCII code for the 'T' key
 constexpr DWORD VK_M = 0x4D;
 constexpr DWORD VK_T = 0x54;
+constexpr DWORD VK_H = 0x48;
 
-constexpr DWORD registeredKeys[] = {VK_F5, VK_DELETE, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_END, VK_HOME, VK_M, VK_T};
+constexpr DWORD registeredKeys[] = {VK_F5, VK_DELETE, VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_END, VK_HOME, VK_M, VK_T, VK_H};
 
 struct Intent
 {

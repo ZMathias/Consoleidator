@@ -28,6 +28,23 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
     return CallNextHookEx(nullptr, code, wParam, lParam);
 }
 
+void PrintHelp(HANDLE hStdOut)
+{
+	const std::string help =
+		"\n----------------------------------------------------\n"
+		"CTRL + SHIFT + DELETE - Clear console\n"
+		"CTRL + SHIFT + M - Maximize console buffer\n"
+		"CTRL + SHIFT + T - Set console title\n"
+		"CTRL + RIGHT - Cycle foreground color forward\n"
+		"CTRL + LEFT - Cycle foreground color backward\n"
+		"CTRL + UP - Cycle background color forward\n"
+		"CTRL + DOWN - Cycle background color backward\n"
+		"CTRL + END - Reset console colors to white on black\n"
+		"CTRL + HOME - Reset console colors to black on white\n"
+		"----------------------------------------------------\n";
+	printf("%s", help.c_str());
+}
+
 bool FillConsoleOutputAttributeAndSet(HANDLE hStdOut, WORD wAttributes, DWORD dwLength)
 {
 	constexpr COORD beginning{0, 0};
@@ -244,6 +261,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 					break;
 	            case MODE_SET_TITLE:
 					SetConsoleTitle(mappedIntent->title);
+					break;
+	            case MODE_HELP:
+					PrintHelp(hStdOut);
 					break;
     		default:
 				break;

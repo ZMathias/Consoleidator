@@ -192,8 +192,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		    wnd.lpszClassName = CLASS_NAME;
 		    wnd.lpfnWndProc = WindowProcTitle;
 		    wnd.style = CS_HREDRAW | CS_VREDRAW;
+
 			// we try to match the Windows 11 dark theme here
-			// have to add some theming based on windows versions
+			// TODO: have to add some theming based on windows versions
 		    wnd.hbrBackground = CreateSolidBrush(0x2b2b2b);
 
 		    if (RegisterClass(&wnd) == NULL)
@@ -416,6 +417,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					InjectDllIntoWindow(CYCLE_BACKGROUND_BACKWARD, hForeground);
 				}
 				return 0;
+			case HOTKEY_HELP:
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(MODE_HELP, hForeground);
+				}
+				return 0;
 			case HOTKEY_SET_TITLE:
 				// this shows the title setting window at the foreground title bar
 				// the injection event is handled when the user presses return
@@ -481,15 +487,15 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	{
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hWnd, &ps);
-		FillRect(hdc, &ps.rcPaint, CreateSolidBrush(buildNumber > WIN11_BUILD ? 0x2b2b2b : 0xffffff));
+		FillRect(hdc, &ps.rcPaint, CreateSolidBrush(0x2b2b2b));
 		EndPaint(hWnd, &ps);
 	    return 0;
 	}
 	case WM_CTLCOLOREDIT:
 	    {
-			SetBkColor((HDC)wParam, buildNumber > WIN11_BUILD ? RGB(43, 43, 43) : RGB(255, 255, 255));
-			SetTextColor((HDC)wParam, buildNumber > WIN11_BUILD ? RGB(255, 255, 255) : RGB(0, 0, 0));
-			return (LPARAM)CreateSolidBrush(buildNumber > WIN11_BUILD ? 0x2b2b2b : 0xffffff);
+			SetBkColor((HDC)wParam, RGB(43, 43, 43));
+			SetTextColor((HDC)wParam, RGB(255, 255, 255));
+			return (LPARAM)CreateSolidBrush(0x2b2b2b);
 	    }
 	case WM_COMMAND:
     {
