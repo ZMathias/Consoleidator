@@ -243,7 +243,13 @@ Updater::Updater(const std::string&& image_version)
 		&si,
 		&pi
 		);
-	if (!success) MessageBox(nullptr, L"Failed to open process", L"Erorr", MB_ICONERROR);
+
+	if (!success)
+	{
+		const std::string error = "Failed to open process";
+		MessageBoxA(nullptr, error.c_str(), "Error", MB_ICONERROR);
+		logger::LogError(error, __FILE__, __LINE__);
+	}
 
 	CloseHandle(pi.hProcess);
 	ResumeThread(pi.hThread);

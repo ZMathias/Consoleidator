@@ -8,6 +8,7 @@
 #include "Updater.hpp"
 #include "resource.h"
 #include "runner-constants.hpp"
+#include "logger.hpp"
 
 #define WIN11_BUILD 22000
 
@@ -30,7 +31,8 @@ LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 WPARAM ConvertToMessage(WPARAM wParam);
 HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
-BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t* optArg = nullptr);
+BOOL IsConsoleWindow(HWND hWnd);
+BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t* optArg = nullptr);
 BOOL ShowTitleSetter();
 std::string to_ascii(const std::wstring& str);
 
@@ -43,10 +45,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.4.2");
+	const Updater updater("v0.4.5");
 	WorkingDirectoryW = updater.ImageDirectory;
 	WorkingDirectoryA = to_ascii(WorkingDirectoryW);
-	buildNumber = updater.GetMajorWindowsVersion();
+
     // Register the window class.
     constexpr wchar_t CLASS_NAME[]  = L"Consoleidator";
     
@@ -74,11 +76,16 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
     if (hWnd == nullptr)
     {
+		const std::string error = "Failed to create Consoleidator window";
+		MessageBoxA(nullptr, error.c_str(), "Fatal error", MB_ICONERROR);
+		logger::LogError(error, __FILE__, __LINE__);
         return 0;
     }
 
     ShowWindow(hWnd, SW_HIDE);
 
+	// set up a file mapping for communicating with the injectable DLL
+	// the dll connects to this "Local\\InjectableMap"
     HANDLE hMapFile = CreateFileMappingA(
         INVALID_HANDLE_VALUE, 
         nullptr, 
@@ -91,6 +98,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (hMapFile == nullptr)
     {
         MessageBox(nullptr, (L"Failed to create keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+		logger::LogError("Failed to create keyboard hook file mapping", __FILE__, __LINE__);
 	    return 0;
     }
 
@@ -105,6 +113,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (mappedIntent == nullptr)
     {
 	    MessageBox(nullptr, (L"Failed to map keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+		logger::LogError("Failed to map keyboard hook file mapping", __FILE__, __LINE__);
 	    return 0;
     }
 
@@ -118,6 +127,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (!ToggleTray(hWnd, hInstance)) 
     {
         MessageBox(nullptr, L"Failed to add to tray", L"Error", MB_ICONERROR);
+		logger::LogError("Failed to add to tray", __FILE__, __LINE__);
     	return 0;
     }
 
@@ -147,6 +157,7 @@ std::string to_ascii(const std::wstring& str)
 
 BOOL ToggleTray(HWND hWnd, HINSTANCE hInstance)
 {
+	// set tray properties and toggle showing state based on current window state 'isShowing'
     if (!isShowing)
     {
 	    wchar_t szTip[128] = L"Consoleidator";
@@ -165,10 +176,13 @@ BOOL ToggleTray(HWND hWnd, HINSTANCE hInstance)
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	// window proc for main application window
 	switch (uMsg)
 	{
 	case WM_CREATE:
 		{
+			// create the title setting window and hide it on startup
+			// we do it this way to minimize resource use and latency when the title setting window is invoked
 			WNDCLASS wnd{};
 
 		    constexpr wchar_t CLASS_NAME[] = L"Consoleidator title setter";
@@ -178,14 +192,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		    wnd.lpszClassName = CLASS_NAME;
 		    wnd.lpfnWndProc = WindowProcTitle;
 		    wnd.style = CS_HREDRAW | CS_VREDRAW;
-		    wnd.hbrBackground = CreateSolidBrush(buildNumber > WIN11_BUILD ? 0x2b2b2b : 0xffffff);
+			// we try to match the Windows 11 dark theme here
+			// have to add some theming based on windows versions
+		    wnd.hbrBackground = CreateSolidBrush(0x2b2b2b);
 
 		    if (RegisterClass(&wnd) == NULL)
 		    {
 			    MessageBox(nullptr, L"Failed to register title setter window class!", L"Error", MB_ICONERROR);
+				logger::LogError("Failed to register title setter window class!", __FILE__, __LINE__);
 		        return 0;
 		    }
 
+			// default window size, will be overwritten in ShowTitleSetter() to match the in-focus windows' title bar size
 		    hWndTitle = CreateWindowEx(
 		        WS_EX_TOOLWINDOW,
 		        CLASS_NAME,
@@ -210,6 +228,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		    // hack to remove the title bar
 		    SetWindowLongPtr(hWndTitle, GWL_STYLE, 0);
 
+			// initialize text field
 		    hWndEdit = CreateWindow
 			(
 		        L"EDIT",
@@ -236,10 +255,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// set the new font
 			SendMessage(hWndEdit, WM_SETFONT, (WPARAM)hNewFont, 0);
 
-			// subclass the edit control
+			// subclass the edit control to capture input loss and detailed key press info to hide the title setter window when needed
 			if (SetWindowSubclass(hWndEdit, EditSubclassProc, 0, 0) == 0)
 			{
 				MessageBox(nullptr, L"Failed to subclass edit control", L"Error", MB_ICONERROR);
+				logger::LogError("Failed to subclass edit control", __FILE__, __LINE__);
 				return 0;
 			}
 
@@ -263,7 +283,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 	case WM_TRAYNOTIFY:
 		{
+			// handle tray icon click
             if (lParam == 512) return 0;
+
+			// show the title setter window
             if (lParam == WM_LBUTTONDBLCLK)
             {
 	            isShowing = true;
@@ -272,10 +295,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
+			// show the context menu
 			if (lParam == WM_RBUTTONUP)
 			{
                 HMENU hMenu = CreatePopupMenu();
 
+				// we build the menu dynamically, not as a resource
+				// it was less of a hassle at the time of writing this
                 wchar_t szShow[] = L"Show";
                 wchar_t szExit[] = L"Exit";
 				MENUITEMINFO mii;
@@ -300,7 +326,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 SetForegroundWindow(hWnd); // a hack to make the menu disappear when the mouse is clicked outside it, windows requires it
 				if (TrackPopupMenuEx(hMenu, TPM_LEFTALIGN, cursor.x, cursor.y,hWnd, nullptr) == 0)
 				{
-					MessageBox(hWnd, (L"Failed to show menu: " + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
+					const std::string error{("Failed to show menu: " + std::to_string(GetLastError()))};
+					MessageBoxA(hWnd, error.c_str(), "Error", MB_ICONERROR);
+					logger::LogError(error, __FILE__, __LINE__);
                     return 0;
 				}
 			}
@@ -312,6 +340,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             const auto wmEvent = HIWORD(wParam);
             switch (wmID)
 			{
+				// hide the window when we click X
             case ID__SHOW:
 				isShowing = true;
 				ShowWindow(hWnd, SW_SHOW);
@@ -324,8 +353,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 		}
+		// self defined window message WM_USER + 1 = 1025
+		// used to handle messages generated by the LowLevelKeyboard hook
 	case WM_PROCESS_KEY:
 		{
+			HWND hForeground = GetForegroundWindow();
 			const auto keyMsg = ConvertToMessage(wParam);
 			switch (keyMsg)
 			{
@@ -345,28 +377,44 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
 				return 0;
             case HOTKEY_CLEAR_CONSOLE:
-            	InjectDllIntoForeground(MODE_CLEAR_CONSOLE);
+				if(IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(MODE_CLEAR_CONSOLE, hForeground);
+				}
 				return 0;
 			case HOTKEY_MAXIMIZE_BUFFER:
-				InjectDllIntoForeground(MODE_MAXIMIZE_BUFFER);
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(MODE_MAXIMIZE_BUFFER, hForeground);
+				}
 				return 0;
             case HOTKEY_RESET_INVERT:
-                InjectDllIntoForeground(MODE_RESET_INVERT);
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(MODE_RESET_INVERT, hForeground);
+				}
                 return 0;
 			case HOTKEY_RESET:
-				InjectDllIntoForeground(MODE_RESET);
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(MODE_RESET, hForeground);
+				}
 				return 0;
 			case HOTKEY_FOREGROUND_FORWARD:
-				InjectDllIntoForeground(CYCLE_FOREGROUND_FORWARD);
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(CYCLE_FOREGROUND_FORWARD, hForeground);
+				}
 				return 0;
 			case HOTKEY_FOREGROUND_BACKWARD:
-				InjectDllIntoForeground(CYCLE_FOREGROUND_BACKWARD);
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(CYCLE_FOREGROUND_BACKWARD, hForeground);
+				}
 				return 0;
 			case HOTKEY_BACKGROUND_FORWARD:
-				InjectDllIntoForeground(CYCLE_BACKGROUND_FORWARD);
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(CYCLE_BACKGROUND_FORWARD, hForeground);
+				}
 				return 0;
 			case HOTKEY_BACKGROUND_BACKWARD:
-				InjectDllIntoForeground(CYCLE_BACKGROUND_BACKWARD);
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(CYCLE_BACKGROUND_BACKWARD, hForeground);
+				}
 				return 0;
 			case HOTKEY_SET_TITLE:
 				// this shows the title setting window at the foreground title bar
@@ -381,6 +429,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_USER_UPDATE_COMPLETE:
 		{
 			MessageBoxW(hWnd, L"Update was completed successfully!", L"Update successful", MB_ICONINFORMATION);
+			logger::LogInfo("Update was completed successfully!", __FILE__, __LINE__);
 			return 0;
 		}
 	default:
@@ -398,10 +447,12 @@ LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 			{
 			case VK_RETURN:
 				{
+					// handle injection when user presses ENTER
+					// we need to get the text from the edit control before we inject
 					wchar_t str[MAX_PATH * 4]{};
 					GetWindowTextW(hWndEdit, str, MAX_PATH * 4);
 					ShowWindow(hWndTitle, SW_HIDE);
-					InjectDllIntoForeground(MODE_SET_TITLE, str);
+					InjectDllIntoWindow(MODE_SET_TITLE, GetForegroundWindow(), str);
 					return 0;
 				}
 			default:
@@ -421,6 +472,9 @@ LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+
+	// TODO: set up theming for title-setter based on windows versions
+	//
 	switch(uMsg)
 	{
     case WM_PAINT:
@@ -439,6 +493,9 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	    }
 	case WM_COMMAND:
     {
+			// hide title setter when focus is lost
+			// BUG: doesn't always work since microsoft restricted how ShowWindow works.
+			// BUG: When the ShowWindow is called, the window doesn't always force itself to the foreground and grab keyboard focus, therefore there won't be a killfocus message generated, since no focus was ever present in the first place.
 	    if (HIWORD(wParam) == EN_KILLFOCUS)
 	    {
 		    ShowWindow(hWndEdit, SW_HIDE);
@@ -452,11 +509,17 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	}
 }
 
-// optional argument used to transfer title to the dll
-BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
+BOOL IsConsoleWindow(HWND hWnd)
+{
+	wchar_t className[MAX_PATH]{};
+	GetClassNameW(hWnd, className, MAX_PATH);
+	return wcscmp(className, L"ConsoleWindowClass") == 0;
+}
+
+// optional argument used to copy window title to the dll
+BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * optArg)
 {
     DWORD process_id{};
-    HWND hForeground = GetForegroundWindow();
     GetWindowThreadProcessId(hForeground, &process_id);
 
     HANDLE hProcess = OpenProcess(
@@ -464,6 +527,8 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
         FALSE,
         process_id
     );
+
+	// set all state data needed for the injection in the mapped memory region
     mappedIntent->loadIntent = false;
     mappedIntent->uiMode = uiMode;
 
@@ -472,10 +537,14 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
 
     if (hProcess == nullptr)
     {
-	    MessageBox(nullptr, (L"Error while opening foreground process: " + std::to_wstring(GetLastError())).c_str(), L"Error while opening process", MB_ICONERROR);
+		const std::string error = "Error while opening foreground process: " + std::to_string(GetLastError());
+	    MessageBoxA(nullptr, error.c_str(), "Error while opening process", MB_ICONERROR);
+		logger::LogError("Error while opening foreground process: " + std::to_string(GetLastError()), __FILE__, __LINE__);
         return EXIT_FAILURE;
     }
 
+	// isn't unicode compatible
+	// BUG: LoadLibraryW refuses to get called, but LoadLibraryA does get called
     char payloadPath[MAX_PATH]{};
 	memcpy(payloadPath, WorkingDirectoryA.data(), WorkingDirectoryA.size());
     memcpy(payloadPath + WorkingDirectoryA.size(), payloadNameA, __builtin_strlen(payloadNameA));
@@ -483,7 +552,9 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
     void* lib_remote = VirtualAllocEx(hProcess, nullptr, __builtin_strlen(payloadPath), MEM_COMMIT, PAGE_READWRITE);
     if (lib_remote == nullptr)
     {
-	    MessageBox(nullptr, (L"Error while allocating memory in remote process: " + std::to_wstring(GetLastError())).c_str(), L"Error while allocating in remote", MB_ICONERROR);
+		const std::string error = "Error while allocating memory in foreground process: " + std::to_string(GetLastError());
+	    MessageBoxA(nullptr, error.c_str(), "Error while allocating in remote", MB_ICONERROR);
+		logger::LogError("Error while allocating memory in foreground process: " + std::to_string(GetLastError()), __FILE__, __LINE__);
 		CloseHandle(hProcess);
         return EXIT_FAILURE;
     }
@@ -491,7 +562,9 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
     HMODULE hKernel32 = GetModuleHandle(L"Kernel32");
     if (hKernel32 == nullptr)
     {
-        MessageBox(nullptr, (L"Error while getting module handle of kernel32.dll: " + std::to_wstring(GetLastError())).c_str(), L"Error while getting module handle", MB_ICONERROR);
+		const std::string error = "Error while getting kernel32 handle: " + std::to_string(GetLastError());
+        MessageBoxA(nullptr, error.c_str(), "Error while getting module handle", MB_ICONERROR);
+		logger::LogError("Error while getting kernel32 handle: " + std::to_string(GetLastError()), __FILE__, __LINE__);
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
@@ -501,11 +574,15 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
     const BOOL result = WriteProcessMemory(hProcess, lib_remote, payloadPath, __builtin_strlen(payloadPath), &written);
     if (result == FALSE)
     {
-    	MessageBox(nullptr, (L"Error while writing to process memory of foreground window: " + std::to_wstring(GetLastError())).c_str(), L"Error while writing to process", MB_ICONERROR);
+		const std::string error = "Error while writing to foreground process: " + std::to_string(GetLastError());
+		MessageBoxA(nullptr, error.c_str(), "Error while writing to remote", MB_ICONERROR);
+		logger::LogError(error, __FILE__, __LINE__);
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
 
+	// assert that we've written the path correctly, otherwise abort because injection will fail and most likely
+	// lead to a crash or destablize the injected app
 	assert(written == __builtin_strlen(payloadPath));
 
 	HANDLE hThread = CreateRemoteThread(
@@ -520,16 +597,19 @@ BOOL InjectDllIntoForeground(unsigned int uiMode, const wchar_t * optArg)
 
     if (hThread == nullptr)
 	{
+		const std::string error = "Error while creating remote thread: " + std::to_string(GetLastError());
+    	MessageBoxA(nullptr, error.c_str(), "Error while creating thread", MB_ICONERROR);
 		CloseHandle(hProcess);
-    	MessageBox(nullptr, (L"Error while creating remote thread: " + std::to_wstring(GetLastError())).c_str(), L"Error while creating thread", MB_ICONERROR);
 	    return EXIT_FAILURE;
 	}
 
     WaitForSingleObject(hThread, INFINITE);
     if (!VirtualFreeEx(hProcess, lib_remote, 0, MEM_RELEASE))
 	{
+		const std::string error = "Error while freeing memory in foreground process: " + std::to_string(GetLastError());
+        MessageBoxA(nullptr, error.c_str(), "Error while freeing memory", MB_ICONERROR);
+		logger::LogError(error, __FILE__, __LINE__);
 		CloseHandle(hProcess);
-        MessageBox(nullptr, (L"Error while freeing memory in remote process: " + std::to_wstring(GetLastError())).c_str(), L"Error while freeing memory", MB_ICONERROR);
 	    return EXIT_FAILURE;
     }
 	
@@ -545,6 +625,9 @@ BOOL ShowTitleSetter()
 
 	// retrieve the handle to the foreground window
     HWND hWndForeground = GetForegroundWindow();
+
+	// check if console window
+	if (!IsConsoleWindow(hWndForeground)) return FALSE;
 
 	// retrieve anchor position 
     GetWindowRect(hWndForeground, &anchor);
@@ -564,9 +647,12 @@ BOOL ShowTitleSetter()
 	// set keyboard focus to edit control
     if (SetFocus(hWndTitle) == nullptr)
     {
-	    MessageBox(nullptr, (L"Cannot set foreground, error: " + std::to_wstring(GetLastError())).c_str(), L"Error while setting foreground", MB_ICONERROR);
+		const std::string error = "Error while setting focus to title window: " + std::to_string(GetLastError());
+		MessageBoxA(nullptr, error.c_str(), "Error while setting focus", MB_ICONERROR);
+		logger::LogError(error, __FILE__, __LINE__);
 		return EXIT_FAILURE;
     }
+
 	if (SetFocus(hWndEdit) == nullptr)
 	{
 	    MessageBox(nullptr, L"Error while setting focus to edit control", L"Error while setting focus", MB_ICONERROR);

@@ -2,7 +2,6 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 
 #pragma once
-#include <codecvt>
 #include <fstream>
 #include <locale>
 #include <Windows.h>
@@ -11,6 +10,7 @@
 #include <string>
 #include <nlohmann/json.hpp>
 #include "runner-constants.hpp"
+#include "logger.hpp"
 
 class Updater
 {

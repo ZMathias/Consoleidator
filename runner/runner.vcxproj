@@ -163,10 +163,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Updater.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="logger.hpp" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="runner-constants.hpp" />
     <ClInclude Include="Updater.hpp" />
