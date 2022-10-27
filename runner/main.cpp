@@ -34,7 +34,7 @@ BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL IsConsoleWindow(HWND hWnd);
 BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t* optArg = nullptr);
 BOOL ShowTitleSetter();
-std::string to_ascii(const std::wstring& str);
+std::string ToAscii(const std::wstring& str);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -47,7 +47,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	
 	const Updater updater("v0.4.5");
 	WorkingDirectoryW = updater.ImageDirectory;
-	WorkingDirectoryA = to_ascii(WorkingDirectoryW);
+	WorkingDirectoryA = ToAscii(WorkingDirectoryW);
 
     // Register the window class.
     constexpr wchar_t CLASS_NAME[]  = L"Consoleidator";
@@ -144,7 +144,40 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     return 0;
 }
 
-std::string to_ascii(const std::wstring& str)
+BOOL AddToStartup()
+{
+	WCHAR wPathToImage[500]{};
+	GetModuleFileNameW(nullptr, wPathToImage, 500);
+
+	HKEY hKey{};
+	LRESULT lResult = 
+		RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, KEY_ALL_ACCESS, &hKey);
+
+	if (lResult != ERROR_SUCCESS) 
+	{
+	    if (lResult == ERROR_FILE_NOT_FOUND) {
+	        MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
+			logger::LogError("Registry key not found while opening startup registry key", __FILE__, __LINE__);
+	    	return TRUE;
+	    } 
+	    else {
+	        MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
+			logger::LogError("Access denied writing to registry.", __FILE__, __LINE__);
+	        return FALSE;
+	    }
+	}
+	
+	lResult = RegSetValueExW(hKey, L"Consoleidator", NULL, REG_SZ, (LPBYTE)wPathToImage, sizeof wPathToImage);
+
+	if (lResult != ERROR_SUCCESS) 
+	{
+        MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
+		logger::LogError("Access denied writing to registry.", __FILE__, __LINE__);
+        return FALSE;
+	}
+}
+
+std::string ToAscii(const std::wstring& str)
 {
 	std::string ret;
 	ret.reserve(str.length());
