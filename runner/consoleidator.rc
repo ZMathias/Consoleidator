@@ -66,6 +66,10 @@ BEGIN
     BEGIN
         MENUITEM "Exit",                        ID__EXIT
     END
+    POPUP "Options"
+    BEGIN
+        MENUITEM "Run at startup",              ID_OPTIONS_RUNATSTARTUP
+    END
 END
 
 
