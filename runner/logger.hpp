@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #define FILE_NAME L"debug_dump.txt"
+#define STENCIL GetTimestamp() + "(at line: " + std::to_string(line) + " in file: " + file + ") "
 
 namespace logger
 {

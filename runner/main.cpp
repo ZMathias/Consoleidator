@@ -6,11 +6,15 @@
 #include <cstdio>
 #include <string>
 #include "Updater.hpp"
-#include "resource.h"
 #include "runner-constants.hpp"
 #include "logger.hpp"
+#include "startup.hpp"
+#include "accent_map.hpp"
+#include "resource.h"
 
 #define WIN11_BUILD 22000
+
+#define ACCENT_TIMEOUT 3000
 
 HWND hWndTitle{};
 HWND hWndEdit{};
@@ -22,9 +26,10 @@ NOTIFYICONDATA nid;
 bool isShowing{false};
 HMODULE payload_base{};
 HINSTANCE hInstance_;
-Intent* mappedIntent;
+MemoryMapDescriptor* sharedMemoryStruct;
 
 
+void ZeroKeyBuffer();
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubClass, DWORD_PTR dwRefData);
@@ -34,22 +39,18 @@ BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL IsConsoleWindow(HWND hWnd);
 BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t* optArg = nullptr);
 BOOL ShowTitleSetter();
-BOOL AddToStartup();
 std::string ToAscii(const std::wstring& str);
-void SetStartupCheckboxGreyed(HWND, bool);
-void SetStartupCheckmark(HWND, bool);
-void ToggleStartup(HWND hWnd);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
 #ifdef _DEBUG
     #define _CRTDBG_MAP_ALLOC
-	#include <stdlib.h>
+	#include <cstdlib>
 	#include <crtdbg.h>
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.4.5");
+	const Updater updater("v0.5.0");
 	WorkingDirectoryW = updater.ImageDirectory;
 	WorkingDirectoryA = ToAscii(WorkingDirectoryW);
 
@@ -95,7 +96,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         nullptr, 
         PAGE_READWRITE, 
         0, 
-        sizeof Intent, 
+        sizeof MemoryMapDescriptor, 
         "Local\\InjectableMap"
     );
 
@@ -106,27 +107,29 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	    return 0;
     }
 
-    mappedIntent = (Intent*)MapViewOfFile(
+    sharedMemoryStruct = (MemoryMapDescriptor*)MapViewOfFile(
         hMapFile,
 		FILE_MAP_WRITE,
 		0,
 		0,
-		sizeof(Intent)
+		sizeof MemoryMapDescriptor
     );
 
-    if (mappedIntent == nullptr)
+    if (sharedMemoryStruct == nullptr)
     {
 	    MessageBox(nullptr, (L"Failed to map keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
 		logger::LogError("Failed to map keyboard hook file mapping", __FILE__, __LINE__);
 	    return 0;
     }
 
-    mappedIntent->loadIntent = true;
-    mappedIntent->hWnd = hWnd;
+	ZeroMemory(sharedMemoryStruct, sizeof MemoryMapDescriptor);
+
+    sharedMemoryStruct->loadIntent = true;
+    sharedMemoryStruct->hWnd = hWnd;
     hInstance_ = hInstance;
 
     if (SetKeyboardHook() == nullptr) return 0;
-
+	
     // after all setup logic is done successfully, then load the tray icon
     if (!ToggleTray(hWnd, hInstance)) 
     {
@@ -134,6 +137,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 		logger::LogError("Failed to add to tray", __FILE__, __LINE__);
     	return 0;
     }
+
+	// all is set-up
+	// we initialise the accent table and merge it with the configurable table
+	InitialiseAccentMap(WorkingDirectoryW);
 
     MSG msg{};
     while (GetMessage(&msg, nullptr, 0, 0) > 0)
@@ -144,177 +151,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
     // free up resources
     CloseHandle(hMapFile);
-    UnmapViewOfFile(mappedIntent);
+    UnmapViewOfFile(sharedMemoryStruct);
     return 0;
-}
-
-BOOL AddToStartup()
-{
-	WCHAR wPathToImage[500]{};
-	GetModuleFileNameW(nullptr, wPathToImage, 500);
-
-	HKEY hKey{};
-	LRESULT lResult = 
-		RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, KEY_ALL_ACCESS, &hKey);
-
-	if (lResult != ERROR_SUCCESS) 
-	{
-	    if (lResult == ERROR_FILE_NOT_FOUND) {
-	        MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
-			logger::LogError("Registry key not found while opening startup registry key", __FILE__, __LINE__);
-	    	return TRUE;
-	    } 
-	    else {
-	        MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
-			logger::LogError("Access denied writing to registry.", __FILE__, __LINE__);
-	        return FALSE;
-	    }
-	}
-	
-	lResult = RegSetValueExW(hKey, L"Consoleidator", NULL, REG_SZ, (LPBYTE)wPathToImage, sizeof wPathToImage);
-
-	if (lResult != ERROR_SUCCESS) 
-	{
-        MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
-		logger::LogError("Access denied writing to registry.", __FILE__, __LINE__);
-        return FALSE;
-	}
-
-	return TRUE;
-}
-
-BOOL RemoveFromStartup()
-{
-	WCHAR wPathToImage[500]{};
-	GetModuleFileNameW(nullptr, wPathToImage, 500);
-
-	HKEY hKey{};
-	LRESULT lResult = 
-		RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, KEY_ALL_ACCESS, &hKey);
-
-	if (lResult != ERROR_SUCCESS) 
-	{
-	    if (lResult == ERROR_FILE_NOT_FOUND) {
-	        MessageBoxW(nullptr, L"Unable to delete from startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
-			logger::LogError("Registry key not found while opening startup registry key", __FILE__, __LINE__);
-	    	return TRUE;
-	    } 
-	    else {
-	        MessageBoxW(nullptr, L"Unable to delete from startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
-			logger::LogError("Access denied writing to registry.", __FILE__, __LINE__);
-	        return FALSE;
-	    }
-	}
-
-	lResult = RegDeleteValueW(hKey, L"Consoleidator");
-
-	if (lResult != ERROR_SUCCESS) 
-	{
-		if (lResult == ERROR_FILE_NOT_FOUND) {
-			MessageBoxW(nullptr, L"Unable to delete from startup registry.\nIt probably wasn't present.\nCheck the log for more information.", L"Error", MB_ICONERROR);
-			logger::LogError("Unable to delete value \"Consoleidator\" due to reason: ERROR_FILE_NOT_FOUND", __FILE__, __LINE__);
-			return FALSE;
-		} else {
-			MessageBoxW(nullptr, L"Unable to delete from startup registry.\nCheck if the program has enough privileges.", L"Error", MB_ICONERROR);
-			logger::LogError("Access denied writing to registry.", __FILE__, __LINE__);
-			return FALSE;
-		}
-        return FALSE;
-	}
-
-	return TRUE;
-}
-
-void ToggleStartup(HWND hWnd)
-{
-	HMENU hmenu = GetMenu(hWnd);
-
-	MENUITEMINFO menuItem{};
-	menuItem.cbSize = sizeof MENUITEMINFO;
-	menuItem.fMask = MIIM_STATE;
-
-	GetMenuItemInfo(hmenu, ID_OPTIONS_RUNATSTARTUP, FALSE, &menuItem);
-
-	if (menuItem.fState == MFS_CHECKED) {
-		// Checked, uncheck it
-		menuItem.fState = RemoveFromStartup() ? MFS_UNCHECKED : MFS_CHECKED;
-	} else {
-		// Unchecked, check it
-		menuItem.fState = AddToStartup() ? MFS_CHECKED : MFS_UNCHECKED;
-	}
-
-	SetMenuItemInfo(hmenu, ID_OPTIONS_RUNATSTARTUP, FALSE, &menuItem);
-}
-
-void SetStartupCheckboxGreyed(HWND hWnd, bool state)
-{
-	// toggle menu item
-	HMENU hMenu{};
-	hMenu = GetMenu(GetActiveWindow());
-
-	MENUITEMINFO menuInfo{};
-	menuInfo.cbSize = sizeof MENUITEMINFO;
-	menuInfo.fMask = MIIM_STATE;
-	GetMenuItemInfo(hMenu, 0, FALSE, &menuInfo);
-	menuInfo.fState = state ? MFS_ENABLED : MFS_DISABLED;
-	SetMenuItemInfo(hMenu, 0, FALSE, &menuInfo);
-}
-
-void SetStartupCheckmark(HWND hWnd, bool state)
-{
-	HMENU hmenu = GetMenu(hWnd);
-
-	MENUITEMINFO menuItem{};
-	menuItem.cbSize = sizeof MENUITEMINFO;
-	menuItem.fMask = MIIM_STATE;
-
-	GetMenuItemInfo(hmenu, ID_OPTIONS_RUNATSTARTUP, FALSE, &menuItem);
-
-	menuItem.fState = state ? MFS_CHECKED : MFS_UNCHECKED;
-
-	SetMenuItemInfo(hmenu, ID_OPTIONS_RUNATSTARTUP, FALSE, &menuItem);
-}
-
-BOOL IsStartup()
-{
-	HKEY hKey{};
-	LRESULT lResult = 
-		RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, KEY_ALL_ACCESS, &hKey);
-
-	if (lResult != ERROR_SUCCESS) 
-	{
-	    if (lResult == ERROR_FILE_NOT_FOUND) {
-			MessageBoxW(nullptr, L"Unable to check for startup presence in the registry. The startup button has been disabled.", L"Error", MB_ICONWARNING);
-			logger::LogError("Registry key not found while opening startup registry key", __FILE__, __LINE__);
-	    	return TRUE;
-	    } 
-	    else {
-	    	MessageBoxW(nullptr, L"Unable to check for startup presence in the registry. The startup button has been disabled.", L"Error", MB_ICONWARNING);
-			// disable the startup checkbox
-			logger::LogError("Access denied writing to registry.", __FILE__, __LINE__);
-	        return FALSE;
-	    }
-	}
-
-	lResult = RegQueryValueExW(
-		hKey,
-		L"Consoleidator",
-		nullptr,
-		nullptr,
-		nullptr,
-		nullptr
-	);
-
-	if (lResult != ERROR_SUCCESS)
-	{
-		if (lResult == ERROR_FILE_NOT_FOUND) {
-			return FALSE;
-		} else {
-			logger::LogError("An error occured while checking for startup presence in the registry.", __FILE__, __LINE__);
-			return FALSE;
-		}
-	}
-	 return TRUE;
 }
 
 std::string ToAscii(const std::wstring& str)
@@ -480,6 +318,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				// it was less of a hassle at the time of writing this
                 wchar_t szShow[] = L"Show";
                 wchar_t szExit[] = L"Exit";
+				wchar_t szRestart[] = L"Restart";
 				MENUITEMINFO mii;
                 mii.cbSize = sizeof(MENUITEMINFO);
 				mii.fMask = MIIM_STRING | MIIM_ID | MIIM_STATE;
@@ -488,15 +327,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				mii.wID = ID__SHOW;
                 mii.dwTypeData = szShow;
 				mii.cch = sizeof szShow;
+				InsertMenuItem(hMenu, ID__SHOW, FALSE, &mii);
 
-                InsertMenuItem(hMenu, ID__SHOW, FALSE, &mii);
+                mii.wID = ID__RESTART;
+                mii.dwTypeData = szRestart;
+                mii.cch = sizeof szRestart;
+                InsertMenuItem(hMenu, ID__RESTART, FALSE, &mii);
 
                 mii.wID = ID__EXIT;
                 mii.dwTypeData = szExit;
-				mii.cch = sizeof szExit;
+                mii.cch = sizeof szExit;
+                InsertMenuItem(hMenu, ID__EXIT, FALSE, &mii);
 
-				InsertMenuItem(hMenu, ID__EXIT, FALSE, &mii);
-				SetMenuDefaultItem(hMenu, ID__SHOW, FALSE);
+                SetMenuDefaultItem(hMenu, ID__SHOW, FALSE);
                 POINT cursor{};
 				GetCursorPos(&cursor);
                 SetForegroundWindow(hWnd); // a hack to make the menu disappear when the mouse is clicked outside it, windows requires it
@@ -511,6 +354,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
 		}
 	case WM_COMMAND:
+		// we process the menu commands here
 		{
 			const auto wmID = LOWORD(wParam);
             const auto wmEvent = HIWORD(wParam);
@@ -525,6 +369,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             case ID__EXIT:
 				PostQuitMessage(0);
                 return 0;
+            case ID__RESTART:
+	            Updater::Restart();
+				return 0;
             case ID_OPTIONS_RUNATSTARTUP:
 	            {
             		ToggleStartup(hWnd);
@@ -604,8 +451,123 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			case HOTKEY_SET_TITLE:
 				// this shows the title setting window at the foreground title bar
 				// the injection event is handled when the user presses return
+				// in the EditSubclassProc function
                 ShowTitleSetter();
 				return 0;
+			case HOTKEY_ACCENT_REPLACE:
+				{
+					// time difference between invocation and last typed character
+					// protects against accidental invocation
+					if (sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1].time -  sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 2].time > ACCENT_TIMEOUT)
+					{
+						// too old
+						ZeroKeyBuffer();
+						return 0;
+					}
+
+					std::string translatedBuffer;
+					BYTE* keyState = new BYTE[256]{};
+
+					// BUG: RACE CONDITION BETWEEN DLL AND THIS CASE READING LAST CHAR (SPACE)
+					for (size_t i = 0; i < KEY_BUF_LEN - 1; ++i)
+					{
+						if (sharedMemoryStruct->keyBuffer[i].vkCode == 0)
+						{
+							continue;
+						}
+						keyState[VK_SHIFT] = sharedMemoryStruct->keyBuffer[i].shiftDown << 7;
+						keyState[VK_CAPITAL] = sharedMemoryStruct->keyBuffer[i].capsToggled;
+						WORD c{};
+						int res = ToAscii(
+							sharedMemoryStruct->keyBuffer[i].vkCode, 
+							sharedMemoryStruct->keyBuffer[i].scanCode,
+							keyState,
+							&c,
+							0
+							);
+
+						switch (res)
+						{
+						case 0:
+							{
+								std::string error = "The specified virtual key (";
+								error += std::to_string(sharedMemoryStruct->keyBuffer[i].vkCode);
+								error += ") has no translation for the current state of the keyboard.";
+								logger::LogError(error, __FILE__, __LINE__);
+								break;
+							}
+						case 1:
+							{
+								translatedBuffer += *reinterpret_cast<char*>(&c);
+								break;
+							}
+						case 2:
+							{
+								translatedBuffer += *reinterpret_cast<char*>(&c);
+								translatedBuffer += *(reinterpret_cast<char*>(&c) + 1);
+								break;
+							}
+						}
+					}
+					delete[] keyState;
+
+					wchar_t composed = L'\0';
+					for (int i = translatedBuffer.length() - 2; i >= 0; --i)
+					{
+						std::string token = translatedBuffer.substr(i, 2);
+						if (accentMap.contains(token))
+						{
+							composed = accentMap[token];
+						}
+					}
+
+					if (composed == L'\0')
+					{
+						ZeroKeyBuffer();
+						return 0;
+					}
+
+					// 8 is the total number of keyboard events to be sent
+					// CTRL UP - SPACE UP - BACKSPACE - BACKSPACE UP - BACKSPACE - BACKSPACE UP - ACCENT CHAR - ACCENT CHAR UP
+					INPUT inputs[8]{};
+					ZeroMemory(inputs, sizeof inputs);
+
+					inputs[0].type = INPUT_KEYBOARD;
+					inputs[0].ki.wVk = VK_CONTROL;
+					inputs[0].ki.dwFlags = KEYEVENTF_KEYUP;
+
+					inputs[1].type = INPUT_KEYBOARD;
+					inputs[1].ki.wVk = VK_SPACE;
+					inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+
+					inputs[2].type = INPUT_KEYBOARD;
+					inputs[2].ki.wVk = VK_BACK;
+					inputs[2].ki.dwFlags = 0;
+
+					inputs[3].type = INPUT_KEYBOARD;
+					inputs[3].ki.wVk = VK_BACK;
+					inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+					inputs[4].type = INPUT_KEYBOARD;
+					inputs[4].ki.wVk = VK_BACK;
+					inputs[4].ki.dwFlags = 0;
+
+					inputs[5].type = INPUT_KEYBOARD;
+					inputs[5].ki.wVk = VK_BACK;
+					inputs[5].ki.dwFlags = KEYEVENTF_KEYUP;
+
+					inputs[6].type = INPUT_KEYBOARD;
+					inputs[6].ki.wScan = composed;
+					inputs[6].ki.wVk = 0;
+					inputs[6].ki.dwFlags = KEYEVENTF_UNICODE;
+
+					inputs[7].type = INPUT_KEYBOARD;
+					inputs[7].ki.wScan = composed;
+					inputs[7].ki.wVk = 0;
+					inputs[7].ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_UNICODE;
+
+					UINT uSent = SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT));
+				}
 			default:
 				return 0;
 			}
@@ -694,6 +656,14 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	}
 }
 
+void ZeroKeyBuffer()
+{
+	for (auto& i : sharedMemoryStruct->keyBuffer)
+	{
+		i = {};
+	}
+}
+
 BOOL IsConsoleWindow(HWND hWnd)
 {
 	wchar_t className[MAX_PATH]{};
@@ -714,11 +684,11 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     );
 
 	// set all state data needed for the injection in the mapped memory region
-    mappedIntent->loadIntent = false;
-    mappedIntent->uiMode = uiMode;
+    sharedMemoryStruct->loadIntent = false;
+    sharedMemoryStruct->uiMode = uiMode;
 
 	// copy title to dll if available
-	if (optArg != nullptr) wcscpy_s(mappedIntent->title, optArg);
+	if (optArg != nullptr) wcscpy_s(sharedMemoryStruct->title, optArg);
 
     if (hProcess == nullptr)
     {
@@ -875,7 +845,7 @@ WPARAM ConvertToMessage(WPARAM wParam)
 {
     SHORT bitmask{};
 
-	bitmask |= ((GetAsyncKeyState(VK_LSHIFT) & 0x8000) == 0x00008000);
+	bitmask |= (GetAsyncKeyState(VK_LSHIFT) & 0x8000) == 0x00008000;
 	bitmask |= ((GetAsyncKeyState(VK_LCONTROL) & 0x8000) == 0x00008000) << 1;
 	bitmask |= ((GetAsyncKeyState(VK_LMENU) & 0x8000) == 0x00008000) << 2;
     if (bitmask == 0) return 0;

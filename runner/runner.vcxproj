@@ -165,12 +165,16 @@
   <ItemGroup>
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="startup.cpp" />
+    <ClCompile Include="accent_map.cpp" />
     <ClCompile Include="Updater.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="logger.hpp" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="runner-constants.hpp" />
+    <ClInclude Include="startup.hpp" />
+    <ClInclude Include="accent_map.hpp" />
     <ClInclude Include="Updater.hpp" />
   </ItemGroup>
   <ItemGroup>

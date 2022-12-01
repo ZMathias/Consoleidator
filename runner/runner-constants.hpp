@@ -20,6 +20,7 @@ constexpr WPARAM HOTKEY_RESET = 8;
 constexpr WPARAM HOTKEY_RESET_INVERT = 9;
 constexpr WPARAM HOTKEY_SET_TITLE = 10;
 constexpr WPARAM HOTKEY_HELP = 11;
+constexpr WPARAM HOTKEY_ACCENT_REPLACE = 12;
 
 // DLL hooking modes set in the mapped memory, the uiMode should be one of these values
 constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
@@ -32,6 +33,8 @@ constexpr unsigned int MODE_RESET = 7;
 constexpr unsigned int MODE_RESET_INVERT = 8;
 constexpr unsigned int MODE_SET_TITLE = 9;
 constexpr unsigned int MODE_HELP = 10;
+
+constexpr size_t KEY_BUF_LEN = 10;
 
 constexpr wchar_t payloadNameW[] = L"consoleidator-injectable.dll";
 constexpr char payloadNameA[] = "consoleidator-injectable.dll";
@@ -69,12 +72,32 @@ constexpr Keycombo registeredCombos[] = {
 	{CONTROL_MOD, VK_DOWN, HOTKEY_BACKGROUND_BACKWARD},
 	{CONTROL_MOD | SHIFT_MOD, VK_T, HOTKEY_SET_TITLE},
 	{CONTROL_MOD | SHIFT_MOD, VK_H, HOTKEY_HELP},
+	{CONTROL_MOD, VK_SPACE, HOTKEY_ACCENT_REPLACE}
 };
 
-struct Intent
+struct KeyDescriptor
 {
+	DWORD vkCode{};
+	DWORD scanCode{};
+	DWORD time{};
+	bool shiftDown = false;
+	bool capsToggled = false;
+};
+
+struct MemoryMapDescriptor
+{
+	// semnifies load intention when calling SetWindowsHookEx
 	bool loadIntent{};
+	// stores the current injection mode of the DLL
+	// used to determine which action to perform on the console
 	unsigned int uiMode{};
+	// stores the hWnd of our parent process
+	// used to send window messages to it from the hotkey handler
 	HWND hWnd{};
+	// stores the title copied from the title setter window
+	// used to actully set the console title
 	wchar_t title[MAX_PATH]{};
+
+	// we store the last two pressed keys here
+	KeyDescriptor keyBuffer[KEY_BUF_LEN]{};
 };

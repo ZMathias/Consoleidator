@@ -188,14 +188,29 @@ std::wstring Updater::RenameOld(const wchar_t* lpPath) const
 
 Updater::Updater(const std::string&& image_version)
 {
+	// TODO: CHECK THIS CODE
 	LocalVersion = ParseToVersion(image_version);
 	ImageDirectory = GetImageDirectory();
 
 	const auto residueFiles = ScanForCorrespondingFiles(L"*_OLD*");
 
+	size_t deleteCounter{};
 	for (const auto& file : residueFiles)
 		if (DeleteFileW(file.data()) == 0)
-			MessageBoxA(nullptr, ("error deleting file " + std::to_string(GetLastError())).data(), "Error", MB_ICONERROR);
+		{
+			logger::LogError("error deleting file " + std::to_string(GetLastError()), __FILE__, __LINE__);
+			Restart();
+		}
+		else
+		{
+			deleteCounter++;
+		}
+
+	if (deleteCounter != 0 && deleteCounter == residueFiles.size())
+	{
+		logger::LogInfo("successfully deleted " + std::to_string(deleteCounter) + " old files.", __FILE__, __LINE__);
+		logger::LogInfo("Update complete.", __FILE__, __LINE__);
+	}
 
 	if (!residueFiles.empty())
 		return;
@@ -204,7 +219,13 @@ Updater::Updater(const std::string&& image_version)
 	const auto json = CheckForUpdates();
 
 	// if it's empty, we're done
-	if (json.empty()) return;
+	if (json.empty()) 
+	{
+		logger::LogInfo("No updates available. Current version: " + image_version, __FILE__, __LINE__);
+		return;
+	}
+
+	logger::LogInfo("update available: " + json["tag_name"].get<std::string>() + ", current version: " + image_version + ". Proceeding with update.", __FILE__, __LINE__);
 
 	const auto files = ScanForCorrespondingFiles(L"consoleidator*");
 	std::vector<std::wstring> oldFiles;
@@ -216,14 +237,14 @@ Updater::Updater(const std::string&& image_version)
 	const auto newFiles = DownloadAndDumpFiles(json);
 	if (files.empty()) return;
 
-	const wchar_t* runFile{};
-	// find consoleidator.exe
-	for (const auto& file : newFiles)
-		if (file.find(L"consoleidator.exe") != std::wstring::npos)
-		{
-			runFile = file.data();
-			break;
-		}
+	Restart();
+}
+
+void Updater::Restart()
+{
+	logger::LogInfo("Restart requested.", __FILE__, __LINE__);
+	const std::wstring ImageDirectory = GetImageDirectory();
+	const std::wstring runFile = ImageDirectory + L"consoleidator.exe";
 
 	// set up call to CreateProcessW
 	STARTUPINFO si{};
@@ -232,7 +253,7 @@ Updater::Updater(const std::string&& image_version)
 	SecureZeroMemory(&pi, sizeof(pi));
 	si.cb = sizeof si;
 	BOOL success = CreateProcessW(
-		runFile,
+		runFile.c_str(),
 		nullptr,
 		nullptr,
 		nullptr,

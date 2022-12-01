@@ -4,9 +4,10 @@
 //
 #define IDI_ICON1                       101
 #define IDR_MENU1                       102
-#define ID__EXIT                        1028
 #define ID_OPTIONS_RUNATSTARTUP         40003
-#define ID__SHOW						WM_USER + 3
+#define ID__SHOW						(WM_USER + 3)
+#define ID__EXIT                        (WM_USER + 4)
+#define ID__RESTART						(WM_USER + 5)
 
 // Next default values for new objects
 // 

@@ -1,0 +1,26 @@
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) Found config file, merging maps
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO](at line:9 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[ERROR] (at line: 250 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) Failed to open process
