@@ -1,4 +1,4 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check it.
+﻿// This is an open source non-commercial project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 
 #pragma once
@@ -7,6 +7,8 @@
 constexpr UINT WM_PROCESS_KEY = WM_USER + 1;
 constexpr UINT WM_TRAYNOTIFY = WM_USER + 2;
 constexpr UINT WM_USER_UPDATE_COMPLETE = WM_USER + 3;
+constexpr UINT WM_MAP_AT = WM_USER + 4;
+constexpr UINT WM_MAP_CONTAINS = WM_USER + 5;
 
 // wparam constants for receiving the hotkey message
 constexpr WPARAM HOTKEY_TOGGLE_SHOW = 1;
@@ -38,6 +40,9 @@ constexpr size_t KEY_BUF_LEN = 10;
 
 constexpr wchar_t payloadNameW[] = L"consoleidator-injectable.dll";
 constexpr char payloadNameA[] = "consoleidator-injectable.dll";
+
+// verification constant for WM_COPYDATA
+constexpr DWORD WM_COPYDATA_VERIFICATION = 0x4D4F4F43;
 
 struct Keycombo
 {
@@ -86,8 +91,12 @@ struct KeyDescriptor
 
 struct MemoryMapDescriptor
 {
-	// semnifies load intention when calling SetWindowsHookEx
-	bool loadIntent{};
+	// this is set when the DLL is used for hooking
+	// the SetWindowsHookEx function expects a return TRUE upon LoadLibrary completion
+	// but to avoid the DLL being loaded into every process we touch, we always return false
+	// except when the DLL is used for hooking, in which case we return true
+	bool hookIntent{};
+
 	// stores the current injection mode of the DLL
 	// used to determine which action to perform on the console
 	unsigned int uiMode{};
@@ -97,7 +106,4 @@ struct MemoryMapDescriptor
 	// stores the title copied from the title setter window
 	// used to actully set the console title
 	wchar_t title[MAX_PATH]{};
-
-	// we store the last two pressed keys here
-	KeyDescriptor keyBuffer[KEY_BUF_LEN]{};
 };

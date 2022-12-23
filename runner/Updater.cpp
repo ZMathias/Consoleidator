@@ -2,7 +2,7 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 #include "Updater.hpp"
 
-int Updater::GetMajorWindowsVersion() const
+int Updater::GetMajorWindowsVersion()
 {
 	DWORD size{ MAX_PATH };
 	char* buff = new char[size] {};
@@ -86,35 +86,32 @@ nlohmann::json Updater::CheckForUpdates() const
 	return json;
 }
 
-std::wstring Updater::DownloadFile(const std::string& url, const std::wstring& fileName) const
+void Updater::DownloadFile(const std::string& url, const std::wstring& fileName) const
 {
-	std::wstring fullPath = ImageDirectory + fileName;
+	const std::wstring fullPath = ImageDirectory + fileName;
 	const auto buffer = MakeRequest(url);
-	if (buffer.empty()) return {};
+	if (buffer.empty()) return;
 	std::ofstream file(fullPath, std::ios::binary);
 	file.write(buffer.data(), buffer.size());
 	file.close();
-	return fullPath;
 }
 
-std::vector<std::wstring> Updater::DownloadAndDumpFiles(const nlohmann::json& json) const
+void Updater::DownloadAndDumpFiles(const nlohmann::json& json) const
 {
-	std::vector<std::wstring> files;
 	const auto assetSize = json["assets"].size();
-	files.reserve(assetSize - 1);
 	for (size_t i = 0; i < assetSize; ++i)
 	{
 		std::string assetName;
 		json["assets"][i]["name"].get_to(assetName);
+		// if not a zip file, then download it
 		if (assetName.find(".zip") == std::string::npos)
 		{
 			std::string url, fileName;
 			json["assets"][i]["browser_download_url"].get_to(url);
 			json["assets"][i]["name"].get_to(fileName);
-			files.emplace_back(DownloadFile(url, to_utf8(fileName)));
+			DownloadFile(url, to_wchar(fileName));
 		}
 	}
-	return files;
 }
 
 int Updater::ParseToVersion(const std::string& str) const
@@ -234,7 +231,7 @@ Updater::Updater(const std::string&& image_version)
 	for (const auto& file : files)
 		oldFiles.emplace_back(RenameOld(file.data()));
 
-	const auto newFiles = DownloadAndDumpFiles(json);
+	DownloadAndDumpFiles(json);
 	if (files.empty()) return;
 
 	Restart();

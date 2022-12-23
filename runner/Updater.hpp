@@ -19,15 +19,15 @@ class Updater
 
 
 	[[nodiscard]] std::vector<char> MakeRequest(const std::string& url) const;
-	[[nodiscard]] std::wstring DownloadFile(const std::string& url, const std::wstring& fileName) const;
 	[[nodiscard]] nlohmann::json CheckForUpdates() const;
 	[[nodiscard]] int ParseToVersion(const std::string& str) const;
 	[[nodiscard]] std::wstring RenameOld(const wchar_t* lpPath) const;
 	[[nodiscard]] std::vector<std::wstring> ScanForCorrespondingFiles(const wchar_t*) const;
 	[[nodiscard]] static std::wstring GetImageDirectory();
-	[[nodiscard]] std::vector<std::wstring> DownloadAndDumpFiles(const nlohmann::json& json) const;
+	void DownloadFile(const std::string& url, const std::wstring& fileName) const;
+	void DownloadAndDumpFiles(const nlohmann::json& json) const;
 
-	static std::wstring to_utf8(const std::string& string)
+	static std::wstring to_wchar(const std::string& string)
 	{
 		std::wstring str;
 		str.reserve(string.size());
@@ -39,7 +39,7 @@ class Updater
 public:
 	std::wstring ImageDirectory{};
 	explicit Updater(const std::string&& image_version);
-	int GetMajorWindowsVersion() const;
+	static int GetMajorWindowsVersion();
 	static void Restart();
 };
 

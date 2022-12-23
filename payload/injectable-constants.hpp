@@ -32,7 +32,11 @@ constexpr DWORD VK_M = 0x4D;
 constexpr DWORD VK_T = 0x54;
 constexpr DWORD VK_H = 0x48;
 
-constexpr DWORD registeredKeys[] = {
+// verification constant for WM_COPYDATA
+constexpr DWORD WM_COPYDATA_VERIFICATION = 0x4D4F4F43;
+
+constexpr DWORD registeredKeys[] = 
+{
 	VK_SPACE,
 	VK_F5,
 	VK_DELETE,
@@ -53,13 +57,18 @@ struct KeyDescriptor
 	DWORD scanCode{};
 	DWORD time{};
 	bool shiftDown = false;
+	bool controlDown = false;
 	bool capsToggled = false;
 };
 
 struct MemoryMapDescriptor
 {
-	// semnifies load intention when calling SetWindowsHookEx
-	bool loadIntent{};
+	// this is set when the DLL is used for hooking
+	// the SetWindowsHookEx function expects a return TRUE upon LoadLibrary completion
+	// but to avoid the DLL being loaded into every process we touch, we always return false
+	// except when the DLL is used for hooking, in which case we return true
+	bool hookIntent{};
+
 	// stores the current injection mode of the DLL
 	// used to determine which action to perform on the console
 	unsigned int uiMode{};
@@ -69,7 +78,4 @@ struct MemoryMapDescriptor
 	// stores the title copied from the title setter window
 	// used to actully set the console title
 	wchar_t title[MAX_PATH]{};
-
-	// we store the last two pressed keys here
-	KeyDescriptor keyBuffer[KEY_BUF_LEN]{};
 };

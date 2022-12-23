@@ -4,25 +4,30 @@
 #include "pch.h"
 #include <string>
 #include "injectable-constants.hpp"
+#include <fstream>
 
 MemoryMapDescriptor* sharedMemoryStruct;
+bool shiftDown = false;
+bool controlDown = false;
+bool capsToggled = false;
+KeyDescriptor keyBuffer[KEY_BUF_LEN]{}; // initialize to zero
 
-void pushQueue()
+void PushBuffer(KeyDescriptor key)
 {
 	for (size_t i = 0; i < KEY_BUF_LEN - 1; ++i)
 	{
-		sharedMemoryStruct->keyBuffer[i] = sharedMemoryStruct->keyBuffer[i + 1];
+		keyBuffer[i] = keyBuffer[i + 1];
 	}
-	sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1] = {};
+	keyBuffer[KEY_BUF_LEN - 1] = key;
 }
 
-void popQueue()
+void PopBuffer()
 {
-	for (size_t i = KEY_BUF_LEN - 1; i >= 1; --i)
+	for (size_t i = KEY_BUF_LEN - 1; i > 0; --i)
 	{
-		sharedMemoryStruct->keyBuffer[i] = sharedMemoryStruct->keyBuffer[i - 1];
+		keyBuffer[i] = keyBuffer[i - 1];
 	}
-	sharedMemoryStruct->keyBuffer[0] = {};
+	keyBuffer[0] = {};
 }
 
 bool isAcceptedChar(const DWORD key)
@@ -34,7 +39,61 @@ bool isAcceptedChar(const DWORD key)
 			(0x41 <= key && key <= 0x5A) || // ASCII A-Z
 			(0x60 <= key && key <= 0x6F) || // ASCII 0-9 NUMPAD and NUMPAD +-*/.
 			(0xBA <= key && key <= 0xE2) || // ASCII ;=,-./`[]\'
-			key == VK_RETURN || key == VK_SPACE || key == VK_BACK;
+			key == VK_SPACE || key == VK_BACK;
+}
+
+std::string translateBuffer()
+{
+	std::string translatedBuffer;
+	translatedBuffer.reserve(KEY_BUF_LEN);
+
+	// convert the buffer to a character string with ToAscii and check for eligible pairs
+	// if eligible, intercept the keypress and we call our parent process for handling the character replacement
+	BYTE* keyState = new BYTE[256]{};
+	for (size_t i = 0; i < KEY_BUF_LEN; ++i)
+	{
+		if (keyBuffer[i].vkCode == NULL)
+		{
+			continue;
+		}
+
+		// set the keyboard state according to MSDN
+		// every key that is pressed has to have the MSB set
+		// every key that has a toggle state (caps, numlock, scrolllock) has to have the LSB set if it is toggled
+		keyState[VK_SHIFT] = keyBuffer[i].shiftDown << 7;
+		keyState[VK_CONTROL] = keyBuffer[i].controlDown << 7;
+		keyState[VK_CAPITAL] = keyBuffer[i].capsToggled;
+
+		WORD ch{};
+		const int res = ToAscii(
+			keyBuffer[i].vkCode,
+			keyBuffer[i].scanCode,
+			keyState,
+			&ch,
+			0
+		);
+
+		switch (res)
+		{
+		case 0:
+			// implement logging
+			break;
+		case 1:
+			// implement logging
+			translatedBuffer += static_cast<char>(ch);
+			break;
+		case 2:
+			// there are two characters stored in the ch variable
+			// the ToAscii probably failed to combine a dead key with a character
+			// we can't do anything about it, so we just append the characters
+			translatedBuffer += *reinterpret_cast<char*>(&ch);
+			translatedBuffer += *(reinterpret_cast<char*>(&ch) + 1);
+			break;
+		default:
+			break;
+		}
+	}
+	return translatedBuffer;
 }
 
 // we send the virtual key-code of a key that is watched by this function
@@ -44,46 +103,67 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 	{
         const auto key = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 
-		static bool shiftDown = false;
-		static bool capsToggled = false;
-
 		// we must store modifier key states in order to properly handle capitals and special characters
-		// this is probably the easiest way to do and it integrates well with the win32 ToUnicode function
+		// this is probably the easiest way to do and it integrates well with the win32 ToAscii function
 		if ((key->vkCode == VK_LSHIFT || key->vkCode == VK_RSHIFT) && 
 			(wParam == WM_KEYFIRST || wParam == WM_KEYLAST || wParam == WM_KEYUP))
 		{
 			shiftDown = !shiftDown;
 		}
-
-		if (key->vkCode == VK_CAPITAL && wParam == WM_KEYUP)
+		else if ((key->vkCode == VK_LCONTROL || key->vkCode == VK_RCONTROL) && 
+			(wParam == WM_KEYFIRST || wParam == WM_KEYLAST || wParam == WM_KEYUP))
+		{
+			controlDown = !controlDown;
+		}
+		else if (key->vkCode == VK_CAPITAL && wParam == WM_KEYUP)
 		{
 			capsToggled = !capsToggled;
 		}
 
         if (wParam == WM_KEYDOWN)
         {
-			// we only store ascii representable keys in the key buffer
-			// this is to prevent the buffer from being filled with control keys that dont end up in a text field
-			// this simplifies checking for a specific decomposed accented key combination
-			if (isAcceptedChar(key->vkCode))
+        	// this is for the accent replacer
+			// it checks if the key is accepted and appends it to a KEY_BUF_LEN sized buffer of type KeyDescriptor
+			// the KeyDescriptor only contains the fields used below
+			// we store keystate to be able to handle special characters with ToAscii
+			if (isAcceptedChar(key->vkCode) && (key->flags & LLKHF_INJECTED))
 			{
-				// treat it as a queue
-				// the most recent key is at the end of the array
-				if (key->vkCode == VK_BACK)
+				switch (key->vkCode)
 				{
-					popQueue();
-				}
-				else
-				{
-					pushQueue();
-					sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1].vkCode = key->vkCode;
-					sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1].scanCode = key->scanCode;
-					sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1].time = key->time;
-					sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1].shiftDown = shiftDown;
-					sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1].capsToggled = capsToggled;
+				case VK_BACK:
+					PopBuffer();
+					break;
+				case VK_SPACE:
+					{
+						const std::string translatedBuffer = translateBuffer();
+						COPYDATASTRUCT cds{};
+						cds.dwData = WM_COPYDATA_VERIFICATION;
+						cds.cbData = translatedBuffer.size() + 1;
+						cds.lpData = (char*)translatedBuffer.c_str();
+
+						// send the buffer contents to our parent process for handling
+						// this includes replacing the characters with the accented counterpart
+						// if this returns 1, we intercept the keypress and the action is complete
+						if (SendMessage(sharedMemoryStruct->hWnd, WM_COPYDATA, 0, (LPARAM)&cds))
+						{
+							// returning any non-zero value will prevent the keypress from propagating to the rest of the system
+							return 1;
+						}
+					}
+				default:
+					KeyDescriptor key_D{};
+					key_D.vkCode = key->vkCode;
+					key_D.scanCode = key->scanCode;
+					key_D.time = key->time;
+					key_D.shiftDown = shiftDown;
+					key_D.controlDown = controlDown;
+					key_D.capsToggled = capsToggled;
+					PushBuffer(key_D);
+					break;
 				}
 			}
-        	for (int i = 0; i < sizeof registeredKeys / sizeof DWORD; ++i)
+
+			for (int i = 0; i < sizeof registeredKeys / sizeof DWORD; ++i)
 	        {
                 if (registeredKeys[i] == key->vkCode)
                 {
@@ -303,7 +383,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			// we must return true for SetWindowsHookEx to succeed
 			// but only when we load actually set the DLL
 			// we need to check for that intention here
-			if (sharedMemoryStruct->loadIntent) return TRUE;
+			if (sharedMemoryStruct->hookIntent) return TRUE;
 
             switch (sharedMemoryStruct->uiMode)
             {

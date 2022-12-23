@@ -33,7 +33,7 @@ void ZeroKeyBuffer();
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubClass, DWORD_PTR dwRefData);
-WPARAM ConvertToMessage(WPARAM wParam);
+WPARAM ConvertToMessage(WPARAM key);
 HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
 BOOL IsConsoleWindow(HWND hWnd);
@@ -124,12 +124,22 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
 	ZeroMemory(sharedMemoryStruct, sizeof MemoryMapDescriptor);
 
-    sharedMemoryStruct->loadIntent = true;
+	
+    sharedMemoryStruct->hookIntent = true;
     sharedMemoryStruct->hWnd = hWnd;
+
+	// a copy of hInstance as a global variable used in the message loop
     hInstance_ = hInstance;
 
-    if (SetKeyboardHook() == nullptr) return 0;
-	
+	// these are fatal conditions
+	// if these don't work the application has no purpose
+	const HHOOK keyboardHook = SetKeyboardHook();
+    if (keyboardHook == nullptr) 
+    {
+		logger::LogError("Failed to set keyboard hook", __FILE__, __LINE__);
+    	return 0;
+	}
+
     // after all setup logic is done successfully, then load the tray icon
     if (!ToggleTray(hWnd, hInstance)) 
     {
@@ -140,7 +150,29 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
 	// all is set-up
 	// we initialise the accent table and merge it with the configurable table
-	InitialiseAccentMap(WorkingDirectoryW);
+	
+	int res = MergeAccentMaps(WorkingDirectoryW);
+
+	switch (res)
+	{
+	case -1:
+		// error case, display message box
+		// we fall back to the default accent table
+		break;
+	case 0:
+		// no accent table found, fall back to default
+		break;
+	case 1:
+		// accent table merged with config file, copy of original is kept
+		break;
+	default:
+		// should never happen
+		break;
+	}
+
+
+	// TODO: convert to a normal array for IPC
+	// TODO: move the code snippet up and make the shared memory allocation dynamic
 
     MSG msg{};
     while (GetMessage(&msg, nullptr, 0, 0) > 0)
@@ -152,6 +184,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     // free up resources
     CloseHandle(hMapFile);
     UnmapViewOfFile(sharedMemoryStruct);
+	UnhookWindowsHookEx(keyboardHook);
     return 0;
 }
 
@@ -360,7 +393,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             const auto wmEvent = HIWORD(wParam);
             switch (wmID)
 			{
-				// hide the window when we click X
+            	// hide the window when we click X
             case ID__SHOW:
 				isShowing = true;
 				ShowWindow(hWnd, SW_SHOW);
@@ -456,128 +489,97 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				return 0;
 			case HOTKEY_ACCENT_REPLACE:
 				{
-					// time difference between invocation and last typed character
-					// protects against accidental invocation
-					if (sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 1].time -  sharedMemoryStruct->keyBuffer[KEY_BUF_LEN - 2].time > ACCENT_TIMEOUT)
-					{
-						// too old
-						ZeroKeyBuffer();
-						return 0;
-					}
-
-					std::string translatedBuffer;
-					BYTE* keyState = new BYTE[256]{};
-
-					// BUG: RACE CONDITION BETWEEN DLL AND THIS CASE READING LAST CHAR (SPACE)
-					for (size_t i = 0; i < KEY_BUF_LEN - 1; ++i)
-					{
-						if (sharedMemoryStruct->keyBuffer[i].vkCode == 0)
-						{
-							continue;
-						}
-						keyState[VK_SHIFT] = sharedMemoryStruct->keyBuffer[i].shiftDown << 7;
-						keyState[VK_CAPITAL] = sharedMemoryStruct->keyBuffer[i].capsToggled;
-						WORD c{};
-						int res = ToAscii(
-							sharedMemoryStruct->keyBuffer[i].vkCode, 
-							sharedMemoryStruct->keyBuffer[i].scanCode,
-							keyState,
-							&c,
-							0
-							);
-
-						switch (res)
-						{
-						case 0:
-							{
-								std::string error = "The specified virtual key (";
-								error += std::to_string(sharedMemoryStruct->keyBuffer[i].vkCode);
-								error += ") has no translation for the current state of the keyboard.";
-								logger::LogError(error, __FILE__, __LINE__);
-								break;
-							}
-						case 1:
-							{
-								translatedBuffer += *reinterpret_cast<char*>(&c);
-								break;
-							}
-						case 2:
-							{
-								translatedBuffer += *reinterpret_cast<char*>(&c);
-								translatedBuffer += *(reinterpret_cast<char*>(&c) + 1);
-								break;
-							}
-						}
-					}
-					delete[] keyState;
-
-					wchar_t composed = L'\0';
-					for (int i = translatedBuffer.length() - 2; i >= 0; --i)
-					{
-						std::string token = translatedBuffer.substr(i, 2);
-						if (accentMap.contains(token))
-						{
-							composed = accentMap[token];
-						}
-					}
-
-					if (composed == L'\0')
-					{
-						ZeroKeyBuffer();
-						return 0;
-					}
-
-					// 8 is the total number of keyboard events to be sent
-					// CTRL UP - SPACE UP - BACKSPACE - BACKSPACE UP - BACKSPACE - BACKSPACE UP - ACCENT CHAR - ACCENT CHAR UP
-					INPUT inputs[8]{};
-					ZeroMemory(inputs, sizeof inputs);
-
-					inputs[0].type = INPUT_KEYBOARD;
-					inputs[0].ki.wVk = VK_CONTROL;
-					inputs[0].ki.dwFlags = KEYEVENTF_KEYUP;
-
-					inputs[1].type = INPUT_KEYBOARD;
-					inputs[1].ki.wVk = VK_SPACE;
-					inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
-
-					inputs[2].type = INPUT_KEYBOARD;
-					inputs[2].ki.wVk = VK_BACK;
-					inputs[2].ki.dwFlags = 0;
-
-					inputs[3].type = INPUT_KEYBOARD;
-					inputs[3].ki.wVk = VK_BACK;
-					inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
-
-					inputs[4].type = INPUT_KEYBOARD;
-					inputs[4].ki.wVk = VK_BACK;
-					inputs[4].ki.dwFlags = 0;
-
-					inputs[5].type = INPUT_KEYBOARD;
-					inputs[5].ki.wVk = VK_BACK;
-					inputs[5].ki.dwFlags = KEYEVENTF_KEYUP;
-
-					inputs[6].type = INPUT_KEYBOARD;
-					inputs[6].ki.wScan = composed;
-					inputs[6].ki.wVk = 0;
-					inputs[6].ki.dwFlags = KEYEVENTF_UNICODE;
-
-					inputs[7].type = INPUT_KEYBOARD;
-					inputs[7].ki.wScan = composed;
-					inputs[7].ki.wVk = 0;
-					inputs[7].ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_UNICODE;
-
-					UINT uSent = SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT));
+					
 				}
 			default:
 				return 0;
 			}
 			return 0;
 		}
-	case WM_USER_UPDATE_COMPLETE:
+	case WM_COPYDATA:
+		// this is used the handle the copied over keybuffer from the low-level keyhook
+		// we decide here if:
+		// 1. the hotkey conditions are met => CTRL + SPACE is pressed
+		// 2. the last two characters are eligible for accent replacement
+		// finally we replace the characters and return true to intercept the SPACE keypress from the keyhook
 		{
-			MessageBoxW(hWnd, L"Update was completed successfully!", L"Update successful", MB_ICONINFORMATION);
-			logger::LogInfo("Update was completed successfully!", __FILE__, __LINE__);
-			return 0;
+			const auto pcds = reinterpret_cast<COPYDATASTRUCT*>(lParam);
+
+			// we check if the data originates from the keyhook
+			// this value is a constant defined in both the keyhook and the main apps constants header
+			// we assign this constant to the dwData field in the keyhook to indicate the message originates from the keyhook
+			if (pcds->dwData != WM_COPYDATA_VERIFICATION)
+			{
+				return DefWindowProc(hWnd, uMsg, wParam, lParam);
+			}
+
+			// since WM_COPYDATA is only sent when space is pressed, we can assume the keypress is VK_SPACE
+			const auto msg = ConvertToMessage(VK_SPACE);
+
+			if (msg != HOTKEY_ACCENT_REPLACE)
+			{
+				// we return false to not hook the SPACE keypress
+				return false;
+			}
+
+			// the lpData field is always a pointer to a character array
+			const std::string translatedBuffer = (char*)pcds->lpData;
+
+			// we assemble the key combo
+			std::string combo;
+			combo += translatedBuffer[translatedBuffer.size() - 2];
+			combo += translatedBuffer[translatedBuffer.size() - 1];
+
+			if (!accentMap.contains(combo))
+			{
+				// this combo is not registered
+				return false;
+			}
+
+
+			wchar_t composed = accentMap[combo];
+			// 8 is the total number of keyboard events to be sent
+			// CTRL UP - SPACE UP - BACKSPACE - BACKSPACE UP - BACKSPACE - BACKSPACE UP - ACCENT CHAR - ACCENT CHAR UP
+			INPUT inputs[8]{};
+			ZeroMemory(inputs, sizeof inputs);
+
+			inputs[0].type = INPUT_KEYBOARD;
+			inputs[0].ki.wVk = VK_CONTROL;
+			inputs[0].ki.dwFlags = KEYEVENTF_KEYUP;
+
+			inputs[1].type = INPUT_KEYBOARD;
+			inputs[1].ki.wVk = VK_SPACE;
+			inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+
+			inputs[2].type = INPUT_KEYBOARD;
+			inputs[2].ki.wVk = VK_BACK;
+			inputs[2].ki.dwFlags = 0;
+
+			inputs[3].type = INPUT_KEYBOARD;
+			inputs[3].ki.wVk = VK_BACK;
+			inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+			inputs[4].type = INPUT_KEYBOARD;
+			inputs[4].ki.wVk = VK_BACK;
+			inputs[4].ki.dwFlags = 0;
+
+			inputs[5].type = INPUT_KEYBOARD;
+			inputs[5].ki.wVk = VK_BACK;
+			inputs[5].ki.dwFlags = KEYEVENTF_KEYUP;
+
+			inputs[6].type = INPUT_KEYBOARD;
+			inputs[6].ki.wScan = composed;
+			inputs[6].ki.wVk = 0;
+			inputs[6].ki.dwFlags = KEYEVENTF_UNICODE;
+
+			inputs[7].type = INPUT_KEYBOARD;
+			inputs[7].ki.wScan = composed;
+			inputs[7].ki.wVk = 0;
+			inputs[7].ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_UNICODE;
+
+			UINT uSent = SendInput(ARRAYSIZE(inputs), inputs, sizeof(INPUT));
+
+			return true;			
 		}
 	default:
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -656,14 +658,6 @@ LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	}
 }
 
-void ZeroKeyBuffer()
-{
-	for (auto& i : sharedMemoryStruct->keyBuffer)
-	{
-		i = {};
-	}
-}
-
 BOOL IsConsoleWindow(HWND hWnd)
 {
 	wchar_t className[MAX_PATH]{};
@@ -684,7 +678,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     );
 
 	// set all state data needed for the injection in the mapped memory region
-    sharedMemoryStruct->loadIntent = false;
+    sharedMemoryStruct->hookIntent = false;
     sharedMemoryStruct->uiMode = uiMode;
 
 	// copy title to dll if available
@@ -820,9 +814,10 @@ BOOL ShowTitleSetter()
 // Sets the low-level keyboard hook defined in consoleidator-injectable/payload-main.cpp
 HHOOK SetKeyboardHook()
 {
-    static HINSTANCE hHookDll{};
+    HINSTANCE hHookDll{};
 
-    //load KeyboardProc dll
+	// load DLL
+	// if it is already loaded then it retrieves the handle to it
     hHookDll = LoadLibraryW(payloadNameW);
     if (hHookDll == nullptr)
 		return nullptr;
@@ -833,7 +828,8 @@ HHOOK SetKeyboardHook()
 }
 
 /*
- * return 0 for bitmask if NO modifier key is pressed, otherwise returns bitmask of pressed modifier keys
+ * return 0 if unable to convert to a hotkey message
+ * otherwise returns the corresponding hotkey message for example: HOTKEY_SET_TITLE
  * parses the states into a bitmask in (almost?) the same way as windows does
  *
  *	    // SHIFT - first bit (0x0001)
@@ -841,7 +837,7 @@ HHOOK SetKeyboardHook()
  *      // ALT - third bit (0x0004)
 */
 // TODO: port to the Windows.h defined modifier macros
-WPARAM ConvertToMessage(WPARAM wParam)
+WPARAM ConvertToMessage(WPARAM key)
 {
     SHORT bitmask{};
 
@@ -851,7 +847,7 @@ WPARAM ConvertToMessage(WPARAM wParam)
     if (bitmask == 0) return 0;
 	for (int i = 0; i < sizeof registeredCombos / sizeof Keycombo; ++i)
 	{
-		if (wParam == (WPARAM)registeredCombos[i].vkCode && bitmask == registeredCombos[i].bitmask)
+		if (key == (WPARAM)registeredCombos[i].vkCode && bitmask == registeredCombos[i].bitmask)
 			return registeredCombos[i].message;
 	}
     return 0;
