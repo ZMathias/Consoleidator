@@ -4,12 +4,12 @@
 #include "pch.h"
 #include <string>
 #include "injectable-constants.hpp"
-#include <fstream>
 
 MemoryMapDescriptor* sharedMemoryStruct;
 bool shiftDown = false;
 bool controlDown = false;
 bool capsToggled = false;
+bool capsTransition = false;
 KeyDescriptor keyBuffer[KEY_BUF_LEN]{}; // initialize to zero
 
 void PushBuffer(KeyDescriptor key)
@@ -96,6 +96,27 @@ std::string translateBuffer()
 	return translatedBuffer;
 }
 
+//std::string convertMessage(WPARAM wParam)
+//{
+//	switch (wParam)
+//	{
+//	case VK_LSHIFT:
+//		return "LSHIFT";
+//	case VK_RSHIFT:
+//		return "RSHIFT";
+//	case VK_SHIFT:
+//		return "SHIFT";
+//	case WM_KEYFIRST:
+//		return "WM_KEYDOWN/WM_KEYFIRST";
+//	case WM_KEYLAST:
+//		return "WM_KEYLAST";
+//	case WM_KEYUP:
+//		return "WM_KEYUP";
+//	default:
+//		return std::to_string(wParam);
+//	}
+//}
+
 // we send the virtual key-code of a key that is watched by this function
 extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
 {
@@ -103,21 +124,47 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 	{
         const auto key = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 
+		if (key->flags & LLKHF_INJECTED)
+		{
+			return CallNextHookEx(nullptr, code, wParam, lParam);
+		}
+
+		//if (key->vkCode == VK_LSHIFT || key->vkCode == VK_RSHIFT || key->vkCode == VK_SHIFT)
+		//{
+		//	std::ofstream file("msg_log.txt", std::ofstream::app);
+		//	file << "vkCode: " << convertMessage(key->vkCode) << " wParam: " << convertMessage(wParam) << '\n';
+		//	file.close();
+		//}
+
 		// we must store modifier key states in order to properly handle capitals and special characters
 		// this is probably the easiest way to do and it integrates well with the win32 ToAscii function
-		if ((key->vkCode == VK_LSHIFT || key->vkCode == VK_RSHIFT) && 
-			(wParam == WM_KEYFIRST || wParam == WM_KEYLAST || wParam == WM_KEYUP))
+		if ((key->vkCode == VK_LSHIFT || key->vkCode == VK_RSHIFT || key->vkCode == VK_SHIFT))
 		{
-			shiftDown = !shiftDown;
+			shiftDown = wParam == WM_KEYDOWN ? true : false;
 		}
-		else if ((key->vkCode == VK_LCONTROL || key->vkCode == VK_RCONTROL) && 
-			(wParam == WM_KEYFIRST || wParam == WM_KEYLAST || wParam == WM_KEYUP))
+		
+		if ((key->vkCode == VK_LCONTROL || key->vkCode == VK_RCONTROL || key->vkCode == VK_CONTROL))
 		{
-			controlDown = !controlDown;
+			controlDown = wParam == WM_KEYDOWN ? true : false;
 		}
-		else if (key->vkCode == VK_CAPITAL && wParam == WM_KEYUP)
+
+		if (key->vkCode == VK_CAPITAL)
 		{
-			capsToggled = !capsToggled;
+			if (wParam == WM_KEYDOWN)
+			{
+				if (!capsTransition)
+				{
+					capsToggled = !capsToggled;
+					capsTransition = true;
+				}
+			}
+			else
+			{
+				if (capsTransition)
+				{
+					capsTransition = false;
+				}
+			}
 		}
 
         if (wParam == WM_KEYDOWN)
@@ -126,7 +173,7 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 			// it checks if the key is accepted and appends it to a KEY_BUF_LEN sized buffer of type KeyDescriptor
 			// the KeyDescriptor only contains the fields used below
 			// we store keystate to be able to handle special characters with ToAscii
-			if (isAcceptedChar(key->vkCode) && (key->flags & LLKHF_INJECTED))
+			if (isAcceptedChar(key->vkCode))
 			{
 				switch (key->vkCode)
 				{
@@ -147,6 +194,8 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 						if (SendMessage(sharedMemoryStruct->hWnd, WM_COPYDATA, 0, (LPARAM)&cds))
 						{
 							// returning any non-zero value will prevent the keypress from propagating to the rest of the system
+							PopBuffer();
+							PopBuffer();
 							return 1;
 						}
 					}

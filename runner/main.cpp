@@ -28,8 +28,6 @@ HMODULE payload_base{};
 HINSTANCE hInstance_;
 MemoryMapDescriptor* sharedMemoryStruct;
 
-
-void ZeroKeyBuffer();
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubClass, DWORD_PTR dwRefData);
@@ -318,6 +316,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		ToggleTray(hWnd, hInstance_);
         return 0;		
 	case WM_DESTROY:
+		ToggleTray(hWnd, hInstance_);
 		PostQuitMessage(0);
 		return 0;
 	case WM_PAINT:
@@ -487,10 +486,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				// in the EditSubclassProc function
                 ShowTitleSetter();
 				return 0;
-			case HOTKEY_ACCENT_REPLACE:
-				{
-					
-				}
 			default:
 				return 0;
 			}
@@ -525,10 +520,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// the lpData field is always a pointer to a character array
 			const std::string translatedBuffer = (char*)pcds->lpData;
 
+			logger::LogInfo("accent replace invoked, buffer contents: " + translatedBuffer, __FILE__, __LINE__);
+
+			// safety measure to prevent segfaults
+			if (translatedBuffer.length() < 2)
+			{
+				return false;
+			}
+
 			// we assemble the key combo
 			std::string combo;
 			combo += translatedBuffer[translatedBuffer.size() - 2];
 			combo += translatedBuffer[translatedBuffer.size() - 1];
+	
 
 			if (!accentMap.contains(combo))
 			{
