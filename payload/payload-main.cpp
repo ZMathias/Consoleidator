@@ -199,6 +199,9 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 							return 1;
 						}
 					}
+
+					// the fallthrough is intented
+					// if there is no replacement, we just append the character to the buffer
 				default:
 					KeyDescriptor key_D{};
 					key_D.vkCode = key->vkCode;

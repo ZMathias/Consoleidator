@@ -8,4 +8,4 @@ BOOL RemoveFromStartup();
 void ToggleStartup(HWND hWnd);
 void SetStartupCheckboxGreyed(HWND hWnd, bool state);
 void SetStartupCheckmark(HWND hWnd, bool state);
-BOOL IsStartup();
+int IsStartup();

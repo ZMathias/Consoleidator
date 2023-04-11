@@ -12,10 +12,6 @@
 #include "accent_map.hpp"
 #include "resource.h"
 
-#define WIN11_BUILD 22000
-
-#define ACCENT_TIMEOUT 3000
-
 HWND hWndTitle{};
 HWND hWndEdit{};
 
@@ -38,6 +34,7 @@ BOOL IsConsoleWindow(HWND hWnd);
 BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t* optArg = nullptr);
 BOOL ShowTitleSetter();
 std::string ToAscii(const std::wstring& str);
+bool DoesLayoutHaveDeadKeys();
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -48,7 +45,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.5.5");
+	const Updater updater("v0.5.6");
 	WorkingDirectoryW = updater.ImageDirectory;
 	WorkingDirectoryA = ToAscii(WorkingDirectoryW);
 
@@ -498,6 +495,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// 2. the last two characters are eligible for accent replacement
 		// finally we replace the characters and return true to intercept the SPACE keypress from the keyhook
 		{
+			static bool deadkeyAlert = false;
 			const auto pcds = reinterpret_cast<COPYDATASTRUCT*>(lParam);
 
 			// we check if the data originates from the keyhook
@@ -516,6 +514,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				// we return false to not hook the SPACE keypress
 				return false;
 			}
+
+			if (!deadkeyAlert && DoesLayoutHaveDeadKeys())
+			{
+				deadkeyAlert = true;
+				MessageBoxW(
+					nullptr,
+					L"The current keyboard layout contains dead-keys. It is advised to switch to a keyboard layout that doesn't have dead keys or define other combinations for accented characters, that don't use said dead keys. For example: German keyboard layout contains the \"´\" dead key. It only appears after pressing the key twice or combining it with another character to produce an accented character. For example pressing \"´\" and then \"a\" produces \"á\". This obviously interferes with the purpose of Consoleidator. The program can be used going further but will require using the shortcut twice successively.",
+					L"Consoleidator dead key warning",
+					MB_ICONWARNING
+					);
+				return false;
+			}
+
 
 			// the lpData field is always a pointer to a character array
 			const std::string translatedBuffer = (char*)pcds->lpData;
@@ -855,4 +866,34 @@ WPARAM ConvertToMessage(WPARAM key)
 			return registeredCombos[i].message;
 	}
     return 0;
+}
+
+
+bool DoesLayoutHaveDeadKeys()
+{
+	BYTE kbState[256]{};
+	GetKeyboardState(kbState);
+	HKL layout = GetKeyboardLayout(0);
+
+	for (UINT i = 0; i < 256; ++i)
+	{
+		kbState[i] = 0x80;
+		WCHAR chr{};
+		int result = ToUnicodeEx(
+			i, 
+			MapVirtualKeyEx(i, MAPVK_VK_TO_VSC, layout), 
+			kbState, 
+			&chr, 
+			1,
+			2,
+			layout
+		);
+
+		if (result == -1)
+		{
+			return true;
+		}
+		kbState[i] = 0;
+	}
+	return false;
 }
