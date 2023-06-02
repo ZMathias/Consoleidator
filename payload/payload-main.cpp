@@ -6,10 +6,13 @@
 #include "injectable-constants.hpp"
 
 MemoryMapDescriptor* sharedMemoryStruct;
+
+// we maintain the states of these variables in the hook
 bool shiftDown = false;
 bool controlDown = false;
 bool capsToggled = false;
 bool capsTransition = false;
+
 KeyDescriptor keyBuffer[KEY_BUF_LEN]{}; // initialize to zero
 
 void PushBuffer(KeyDescriptor key)
@@ -42,13 +45,15 @@ bool isAcceptedChar(const DWORD key)
 			key == VK_SPACE || key == VK_BACK;
 }
 
+
 std::string translateBuffer()
 {
 	std::string translatedBuffer;
 	translatedBuffer.reserve(KEY_BUF_LEN);
 
-	// convert the buffer to a character string with ToAscii and check for eligible pairs
-	// if eligible, intercept the keypress and we call our parent process for handling the character replacement
+	// convert the keyBuffer to a string with ToAscii and then check for eligible pairs
+	// we use ToAscii to handle cases like pressing shift and '/' to produce '?'
+	// the same applies to capitals aswell
 	BYTE* keyState = new BYTE[256]{};
 	for (size_t i = 0; i < KEY_BUF_LEN; ++i)
 	{
@@ -96,28 +101,7 @@ std::string translateBuffer()
 	return translatedBuffer;
 }
 
-//std::string convertMessage(WPARAM wParam)
-//{
-//	switch (wParam)
-//	{
-//	case VK_LSHIFT:
-//		return "LSHIFT";
-//	case VK_RSHIFT:
-//		return "RSHIFT";
-//	case VK_SHIFT:
-//		return "SHIFT";
-//	case WM_KEYFIRST:
-//		return "WM_KEYDOWN/WM_KEYFIRST";
-//	case WM_KEYLAST:
-//		return "WM_KEYLAST";
-//	case WM_KEYUP:
-//		return "WM_KEYUP";
-//	default:
-//		return std::to_string(wParam);
-//	}
-//}
-
-// we send the virtual key-code of a key that is watched by this function
+// we send the virtual key-code of a key that is monitored by this function
 extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, LPARAM lParam)
 {
 	if (code == HC_ACTION)
@@ -128,13 +112,6 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 		{
 			return CallNextHookEx(nullptr, code, wParam, lParam);
 		}
-
-		//if (key->vkCode == VK_LSHIFT || key->vkCode == VK_RSHIFT || key->vkCode == VK_SHIFT)
-		//{
-		//	std::ofstream file("msg_log.txt", std::ofstream::app);
-		//	file << "vkCode: " << convertMessage(key->vkCode) << " wParam: " << convertMessage(wParam) << '\n';
-		//	file.close();
-		//}
 
 		// we must store modifier key states in order to properly handle capitals and special characters
 		// this is probably the easiest way to do and it integrates well with the win32 ToAscii function
@@ -170,9 +147,9 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
         if (wParam == WM_KEYDOWN)
         {
         	// this is for the accent replacer
-			// it checks if the key is accepted and appends it to a KEY_BUF_LEN sized buffer of type KeyDescriptor
+			// it checks if the key is accepted (diacritic capable keys such as A, B, C. We excludes characters such as - * /) and appends it to a KEY_BUF_LEN sized buffer of type KeyDescriptor
 			// the KeyDescriptor only contains the fields used below
-			// we store keystate to be able to handle special characters with ToAscii
+			// we store keystate to be able to handle special characters and capitals with ToAscii
 			if (isAcceptedChar(key->vkCode))
 			{
 				switch (key->vkCode)
@@ -432,9 +409,15 @@ BOOL APIENTRY DllMain( HMODULE hModule,
                 return FALSE;
     		}
 
-			// we must return true for SetWindowsHookEx to succeed
-			// but only when we load actually set the DLL
-			// we need to check for that intention here
+			const KeyDescriptor initKeyState = sharedMemoryStruct->initKeyState;
+			capsToggled = initKeyState.capsToggled;
+			shiftDown = initKeyState.shiftDown;
+			controlDown = initKeyState.controlDown;
+
+			// DLL_PROCESS_ATTACH must return true, otherwise the SetWindowsHookEx() function fails and removes the hook.
+			// Since our DLL is multipurpose and we don't want to remain loaded into every process the shortcut is called upon,
+			// we return false for every other action, thus tricking windows into thinking DLL loading failed, even though we
+			// have done everything that was requested.
 			if (sharedMemoryStruct->hookIntent) return TRUE;
 
             switch (sharedMemoryStruct->uiMode)

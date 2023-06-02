@@ -35,6 +35,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t* o
 BOOL ShowTitleSetter();
 std::string ToAscii(const std::wstring& str);
 bool DoesLayoutHaveDeadKeys();
+KeyDescriptor GetInitKeyStates();
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -119,9 +120,9 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
 	ZeroMemory(sharedMemoryStruct, sizeof MemoryMapDescriptor);
 
-	
-    sharedMemoryStruct->hookIntent = true;
+	sharedMemoryStruct->hookIntent = true;
     sharedMemoryStruct->hWnd = hWnd;
+	sharedMemoryStruct->initKeyState = GetInitKeyStates();
 
 	// a copy of hInstance as a global variable used in the message loop
     hInstance_ = hInstance;
@@ -145,8 +146,9 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
 	// all is set-up
 	// we initialise the accent table and merge it with the configurable table
-	
-	int res = MergeAccentMaps(WorkingDirectoryW);
+	// it extends an internally maintained map of the diacritic pairings
+	// calling this function will update that map with new pairings at the gives path, if there is any found that is
+	const int res = MergeAccentMaps(WorkingDirectoryW);
 
 	switch (res)
 	{
@@ -896,4 +898,18 @@ bool DoesLayoutHaveDeadKeys()
 		kbState[i] = 0;
 	}
 	return false;
+}
+
+KeyDescriptor GetInitKeyStates()
+{
+	KeyDescriptor kd{};
+	SHORT capsLockState = GetKeyState(VK_CAPITAL);
+	SHORT shiftState = GetKeyState(VK_SHIFT);
+	SHORT controlState = GetKeyState(VK_CONTROL);
+
+	kd.capsToggled = (capsLockState & 0x0001) != 0;
+	kd.shiftDown = (shiftState & 0x8000) != 0;
+	kd.controlDown = (controlState & 0x8000) != 0;
+
+	return kd;
 }

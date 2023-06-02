@@ -85,6 +85,7 @@ struct KeyDescriptor
 	DWORD vkCode{};
 	DWORD scanCode{};
 	DWORD time{};
+	bool controlDown = false;
 	bool shiftDown = false;
 	bool capsToggled = false;
 };
@@ -106,4 +107,8 @@ struct MemoryMapDescriptor
 	// stores the title copied from the title setter window
 	// used to actully set the console title
 	wchar_t title[MAX_PATH]{};
+
+	// we use the KeyDescriptor at startup to check initial keystates
+	// key states maintained in the hook are only relative to KEYDOWN and KEYUP messages, thus it can be incorrect to assume that, upon startup, every key is in its default state
+	KeyDescriptor initKeyState{};
 };
