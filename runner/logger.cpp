@@ -39,19 +39,19 @@ std::string GetTimestamp()
 	return timest;
 }
 
-void logger::LogError(const std::string& text, const std::string& file, const unsigned int line)
+void logger::LogError_(const std::string& text, const std::string& file, const unsigned int line)
 {
 	const std::string trace = "[ERROR]" + STENCIL + text + "\r\n";
 	Log(trace, file, line);
 }
 
-void logger::LogWarning(const std::string& text, const std::string& file, const unsigned int line)
+void logger::LogWarning_(const std::string& text, const std::string& file, const unsigned int line)
 {
 	const std::string trace = "[WARN]" + STENCIL + text + "\r\n";
 	Log(trace, file, line);
 }
 
-void logger::LogInfo(const std::string& text, const std::string& file, const unsigned int line)
+void logger::LogInfo_(const std::string& text, const std::string& file, const unsigned int line)
 {
 	const std::string trace = "[INFO]" + STENCIL + text + "\r\n";
 	Log(trace, file, line);	

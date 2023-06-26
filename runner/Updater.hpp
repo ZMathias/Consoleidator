@@ -41,5 +41,6 @@ public:
 	explicit Updater(const std::string&& image_version);
 	static int GetMajorWindowsVersion();
 	static void Restart();
+	static bool CheckAdminPrivileges();
 };
 

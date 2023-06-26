@@ -46,7 +46,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.5.6");
+	const Updater updater("v0.5.7");
 	WorkingDirectoryW = updater.ImageDirectory;
 	WorkingDirectoryA = ToAscii(WorkingDirectoryW);
 
@@ -79,7 +79,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     {
 		const std::string error = "Failed to create Consoleidator window";
 		MessageBoxA(nullptr, error.c_str(), "Fatal error", MB_ICONERROR);
-		logger::LogError(error, __FILE__, __LINE__);
+		logger::LogError(error);
         return 0;
     }
 
@@ -99,7 +99,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (hMapFile == nullptr)
     {
         MessageBox(nullptr, (L"Failed to create keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-		logger::LogError("Failed to create keyboard hook file mapping", __FILE__, __LINE__);
+		logger::LogError("Failed to create keyboard hook file mapping");
 	    return 0;
     }
 
@@ -114,7 +114,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (sharedMemoryStruct == nullptr)
     {
 	    MessageBox(nullptr, (L"Failed to map keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-		logger::LogError("Failed to map keyboard hook file mapping", __FILE__, __LINE__);
+		logger::LogError("Failed to map keyboard hook file mapping");
 	    return 0;
     }
 
@@ -132,7 +132,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	const HHOOK keyboardHook = SetKeyboardHook();
     if (keyboardHook == nullptr) 
     {
-		logger::LogError("Failed to set keyboard hook", __FILE__, __LINE__);
+		logger::LogError("Failed to set keyboard hook");
     	return 0;
 	}
 
@@ -140,7 +140,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (!ToggleTray(hWnd, hInstance)) 
     {
         MessageBox(nullptr, L"Failed to add to tray", L"Error", MB_ICONERROR);
-		logger::LogError("Failed to add to tray", __FILE__, __LINE__);
+		logger::LogError("Failed to add to tray");
     	return 0;
     }
 
@@ -241,7 +241,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		    if (RegisterClass(&wnd) == NULL)
 		    {
 			    MessageBox(nullptr, L"Failed to register title setter window class!", L"Error", MB_ICONERROR);
-				logger::LogError("Failed to register title setter window class!", __FILE__, __LINE__);
+				logger::LogError("Failed to register title setter window class!");
 		        return 0;
 		    }
 
@@ -301,7 +301,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (SetWindowSubclass(hWndEdit, EditSubclassProc, 0, 0) == 0)
 			{
 				MessageBox(nullptr, L"Failed to subclass edit control", L"Error", MB_ICONERROR);
-				logger::LogError("Failed to subclass edit control", __FILE__, __LINE__);
+				logger::LogError("Failed to subclass edit control");
 				return 0;
 			}
 
@@ -378,7 +378,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				{
 					const std::string error{("Failed to show menu: " + std::to_string(GetLastError()))};
 					MessageBoxA(hWnd, error.c_str(), "Error", MB_ICONERROR);
-					logger::LogError(error, __FILE__, __LINE__);
+					logger::LogError(error);
                     return 0;
 				}
 			}
@@ -533,7 +533,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// the lpData field is always a pointer to a character array
 			const std::string translatedBuffer = (char*)pcds->lpData;
 
-			logger::LogInfo("accent replace invoked, buffer contents: " + translatedBuffer, __FILE__, __LINE__);
+			logger::LogInfo("accent replace invoked, buffer contents: " + translatedBuffer);
 
 			// safety measure to prevent segfaults
 			if (translatedBuffer.length() < 2)
@@ -705,7 +705,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while opening foreground process: " + std::to_string(GetLastError());
 	    MessageBoxA(nullptr, error.c_str(), "Error while opening process", MB_ICONERROR);
-		logger::LogError("Error while opening foreground process: " + std::to_string(GetLastError()), __FILE__, __LINE__);
+		logger::LogError("Error while opening foreground process: " + std::to_string(GetLastError()));
         return EXIT_FAILURE;
     }
 
@@ -720,7 +720,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while allocating memory in foreground process: " + std::to_string(GetLastError());
 	    MessageBoxA(nullptr, error.c_str(), "Error while allocating in remote", MB_ICONERROR);
-		logger::LogError("Error while allocating memory in foreground process: " + std::to_string(GetLastError()), __FILE__, __LINE__);
+		logger::LogError("Error while allocating memory in foreground process: " + std::to_string(GetLastError()));
 		CloseHandle(hProcess);
         return EXIT_FAILURE;
     }
@@ -730,7 +730,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while getting kernel32 handle: " + std::to_string(GetLastError());
         MessageBoxA(nullptr, error.c_str(), "Error while getting module handle", MB_ICONERROR);
-		logger::LogError("Error while getting kernel32 handle: " + std::to_string(GetLastError()), __FILE__, __LINE__);
+		logger::LogError("Error while getting kernel32 handle: " + std::to_string(GetLastError()));
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
@@ -742,7 +742,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while writing to foreground process: " + std::to_string(GetLastError());
 		MessageBoxA(nullptr, error.c_str(), "Error while writing to remote", MB_ICONERROR);
-		logger::LogError(error, __FILE__, __LINE__);
+		logger::LogError(error);
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
@@ -774,7 +774,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
 	{
 		const std::string error = "Error while freeing memory in foreground process: " + std::to_string(GetLastError());
         MessageBoxA(nullptr, error.c_str(), "Error while freeing memory", MB_ICONERROR);
-		logger::LogError(error, __FILE__, __LINE__);
+		logger::LogError(error);
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
@@ -815,7 +815,7 @@ BOOL ShowTitleSetter()
     {
 		const std::string error = "Error while setting focus to title window: " + std::to_string(GetLastError());
 		MessageBoxA(nullptr, error.c_str(), "Error while setting focus", MB_ICONERROR);
-		logger::LogError(error, __FILE__, __LINE__);
+		logger::LogError(error);
 		return EXIT_FAILURE;
     }
 

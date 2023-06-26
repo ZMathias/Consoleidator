@@ -11,12 +11,12 @@ auto MergeAccentMaps(const std::wstring& workingDirectory) -> int
 
 	if (!configFile.is_open())
 	{
-		logger::LogInfo("No config file present, falling back to built-in accent map", __FILE__, __LINE__);
+		logger::LogInfo("No config file present, falling back to built-in accent map");
 		// no config file present, return
 		return 0;
 	}
 
-	logger::LogInfo("Found config file, merging maps", __FILE__, __LINE__);
+	logger::LogInfo("Found config file, merging maps");
 
 	std::string line{}, keyBuffer{}, valueBuffer{};
 	std::wstring convertedValues{};
@@ -52,7 +52,7 @@ auto MergeAccentMaps(const std::wstring& workingDirectory) -> int
 		error = "Exception occurred: Failure to convert accent map values buffer size using MultiByteToWideChar: convertResult=";
 		error += std::to_string(result);
 		error += "  GetLastError()=" + std::to_string(GetLastError());
-		logger::LogError(error, __FILE__, __LINE__);
+		logger::LogError(error);
 		return -1;
 	}
 
@@ -73,7 +73,7 @@ auto MergeAccentMaps(const std::wstring& workingDirectory) -> int
 		error = "Exception occurred: Failure to convert accent map values using MultiByteToWideChar: convertResult=";
 		error += std::to_string(result);
 		error += "  GetLastError()=" + std::to_string(GetLastError());
-		logger::LogError(error, __FILE__, __LINE__);
+		logger::LogError(error);
 		return -1;
 	}
 

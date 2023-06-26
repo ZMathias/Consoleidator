@@ -195,7 +195,7 @@ Updater::Updater(const std::string&& image_version)
 	for (const auto& file : residueFiles)
 		if (DeleteFileW(file.data()) == 0)
 		{
-			logger::LogError("error deleting file " + std::to_string(GetLastError()), __FILE__, __LINE__);
+			logger::LogError("error deleting file " + std::to_string(GetLastError()));
 			Restart();
 		}
 		else
@@ -205,8 +205,8 @@ Updater::Updater(const std::string&& image_version)
 
 	if (deleteCounter != 0 && deleteCounter == residueFiles.size())
 	{
-		logger::LogInfo("successfully deleted " + std::to_string(deleteCounter) + " old files.", __FILE__, __LINE__);
-		logger::LogInfo("Update complete.", __FILE__, __LINE__);
+		logger::LogInfo("successfully deleted " + std::to_string(deleteCounter) + " old files.");
+		logger::LogInfo("Update complete.");
 	}
 
 	if (!residueFiles.empty())
@@ -218,11 +218,11 @@ Updater::Updater(const std::string&& image_version)
 	// if it's empty, we're done
 	if (json.empty()) 
 	{
-		logger::LogInfo("No updates available. Current version: " + image_version, __FILE__, __LINE__);
+		logger::LogInfo("No updates available. Current version: " + image_version);
 		return;
 	}
 
-	logger::LogInfo("update available: " + json["tag_name"].get<std::string>() + ", current version: " + image_version + ". Proceeding with update.", __FILE__, __LINE__);
+	logger::LogInfo("update available: " + json["tag_name"].get<std::string>() + ", current version: " + image_version + ". Proceeding with update.");
 
 	const auto files = ScanForCorrespondingFiles(L"consoleidator*");
 	std::vector<std::wstring> oldFiles;
@@ -237,9 +237,55 @@ Updater::Updater(const std::string&& image_version)
 	Restart();
 }
 
+bool Updater::CheckAdminPrivileges()
+{
+	BOOL fIsRunAsAdmin = FALSE;
+    DWORD dwError = ERROR_SUCCESS;
+    PSID pAdministratorsGroup = nullptr;
+
+    // Allocate and initialize a SID of the administrators group.
+    SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
+    if (!AllocateAndInitializeSid(
+        &NtAuthority, 
+        2, 
+        SECURITY_BUILTIN_DOMAIN_RID, 
+        DOMAIN_ALIAS_RID_ADMINS, 
+        0, 0, 0, 0, 0, 0, 
+        &pAdministratorsGroup))
+    {
+        dwError = GetLastError();
+        goto Cleanup;
+    }
+
+    // Determine whether the SID of administrators group is enabled in 
+    // the primary access token of the process.
+    if (!CheckTokenMembership(nullptr, pAdministratorsGroup, &fIsRunAsAdmin))
+    {
+        dwError = GetLastError();
+    }
+
+Cleanup:
+    // Centralized cleanup for all allocated resources.
+    if (pAdministratorsGroup)
+    {
+        FreeSid(pAdministratorsGroup);
+        pAdministratorsGroup = nullptr;
+    }
+
+    // Throw the error if something failed in the function.
+    if (ERROR_SUCCESS != dwError)
+    {
+		logger::LogError("Couldn't check rights for administrative privileges");
+        return false;
+    }
+
+    return fIsRunAsAdmin;
+}
+
+// this restarts the process as is all the while retaining the original privileges
 void Updater::Restart()
 {
-	logger::LogInfo("Restart requested.", __FILE__, __LINE__);
+	logger::LogInfo("Restart requested.");
 	const std::wstring ImageDirectory = GetImageDirectory();
 	const std::wstring runFile = ImageDirectory + L"consoleidator.exe";
 
@@ -249,7 +295,7 @@ void Updater::Restart()
 	SecureZeroMemory(&si, sizeof(si));
 	SecureZeroMemory(&pi, sizeof(pi));
 	si.cb = sizeof si;
-	BOOL success = CreateProcessW(
+	const BOOL success = CreateProcessW(
 		runFile.c_str(),
 		nullptr,
 		nullptr,
@@ -266,7 +312,7 @@ void Updater::Restart()
 	{
 		const std::string error = "Failed to open process";
 		MessageBoxA(nullptr, error.c_str(), "Error", MB_ICONERROR);
-		logger::LogError(error, __FILE__, __LINE__);
+		logger::LogError(error);
 	}
 
 	CloseHandle(pi.hProcess);
