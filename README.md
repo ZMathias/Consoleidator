@@ -2,7 +2,7 @@
 ### Gives access through shortcuts to system API only command-line functionality on the fly to multiple cmd windows even when STDOUT is being written to:
 - Changing foreground and background colours of the terminal on the fly.
 - Maximizing or changing the console buffer size.
-- Clearing the output buffer of the console even while another process is being executed in the console.
+- Clearing the output buffer of the console even while another process is being executed.
 - Setting a custom title for the window.
 
 ## Quick accent typer
