@@ -1,7 +1,17 @@
-## A tiny and fast tool for extending command-line functionality and ease of use.
-### Everything is triggered by a customizable shortcut, and the action will carried out on the ***foreground window***.
-### Runs in the background and gives easy access to otherwise hard to change command-line properties only available through the system API, like:
-- Changing foreground and background color of text by a customizable shortcut.
+## A tiny tray utility for extending the functionality of the command line.
+### Gives access through shortcuts to system API only command-line functionality on the fly to multiple cmd windows even when STDOUT is being written to:
+- Changing foreground and background colours of the terminal on the fly.
 - Maximizing or changing the console buffer size.
-- Quickly erasing the contents of the command-line, even while it's being written to or when the prompt is unavailable. This is also triggered by a shortcut.
-- Setting the title of the window.
+- Clearing the output buffer of the console even while another process is being executed in the console.
+- Setting a custom title for the window.
+
+## Quick accent typer
+Type any accented character by combining the base letter with the corresponding accent character. 
+
+For example
+
+![accent_typer_example](https://github.com/ZMathias/Consoleidator/assets/78689074/b0b68f1c-9274-4a26-8512-824d2a02c567)
+
+## Getting started
+Open up a cmd window and press CTRL + SHIFT + H and find out all the keyboard shortcuts.
+The executable runs in the tray and acts upon the foreground command-line window. This enables operation on multiple windows at the same time.
