@@ -224,6 +224,10 @@ Updater::Updater(const std::string&& image_version)
 	if (!residueFiles.empty())
 		return;
 
+#ifdef _STRIPPED_NO_UPDATE_
+	return;
+#endif
+#ifndef _STRIPPED_NO_UPDATE_
 	// if no updates are available, we return an empty json object
 	const auto json = CheckForUpdates();
 
@@ -248,6 +252,7 @@ Updater::Updater(const std::string&& image_version)
 	// UPDATE ROUTINE OVER
 
 	Restart();
+#endif
 }
 
 bool Updater::HasAdminPrivileges()

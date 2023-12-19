@@ -12,6 +12,7 @@
 #include "runner-constants.hpp"
 #include "logger.hpp"
 
+
 class Updater
 {
 	const std::string VersionUrl{"https://api.github.com/repos/ZMathias/Consoleidator/releases/latest"};
