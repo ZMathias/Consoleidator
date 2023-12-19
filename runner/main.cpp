@@ -27,6 +27,8 @@ MemoryMapDescriptor* sharedMemoryStruct;
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubClass, DWORD_PTR dwRefData);
+UINT_PTR CALLBACK OFNHookProcOldStyle(HWND, UINT, WPARAM, LPARAM);
+
 WPARAM ConvertToMessage(WPARAM key);
 HHOOK SetKeyboardHook();
 BOOL ToggleTray(HWND, HINSTANCE hInstance);
@@ -36,6 +38,8 @@ BOOL ShowTitleSetter();
 std::string ToAscii(const std::wstring& str);
 bool DoesLayoutHaveDeadKeys();
 KeyDescriptor GetInitKeyStates();
+HANDLE InitializePipe();
+std::string ReadBufferDataFromPipe(HANDLE);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -46,8 +50,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.5.7");
-	WorkingDirectoryW = updater.ImageDirectory;
+	const Updater updater("v0.5.9");
+	WorkingDirectoryW = updater.ExecutableDirectory;
 	WorkingDirectoryA = ToAscii(WorkingDirectoryW);
 
     // Register the window class.
@@ -79,7 +83,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     {
 		const std::string error = "Failed to create Consoleidator window";
 		MessageBoxA(nullptr, error.c_str(), "Fatal error", MB_ICONERROR);
-		logger::LogError(error);
+		LogError(error);
         return 0;
     }
 
@@ -99,7 +103,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (hMapFile == nullptr)
     {
         MessageBox(nullptr, (L"Failed to create keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-		logger::LogError("Failed to create keyboard hook file mapping");
+		LogError("Failed to create keyboard hook file mapping");
 	    return 0;
     }
 
@@ -114,12 +118,13 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (sharedMemoryStruct == nullptr)
     {
 	    MessageBox(nullptr, (L"Failed to map keyboard hook file mapping" + std::to_wstring(GetLastError())).c_str(), L"Error", MB_ICONERROR);
-		logger::LogError("Failed to map keyboard hook file mapping");
+		LogError("Failed to map keyboard hook file mapping");
 	    return 0;
     }
 
 	ZeroMemory(sharedMemoryStruct, sizeof MemoryMapDescriptor);
 
+	// populate fields for DLL
 	sharedMemoryStruct->hookIntent = true;
     sharedMemoryStruct->hWnd = hWnd;
 	sharedMemoryStruct->initKeyState = GetInitKeyStates();
@@ -132,7 +137,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	const HHOOK keyboardHook = SetKeyboardHook();
     if (keyboardHook == nullptr) 
     {
-		logger::LogError("Failed to set keyboard hook");
+		LogError("Failed to set keyboard hook");
     	return 0;
 	}
 
@@ -140,7 +145,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     if (!ToggleTray(hWnd, hInstance)) 
     {
         MessageBox(nullptr, L"Failed to add to tray", L"Error", MB_ICONERROR);
-		logger::LogError("Failed to add to tray");
+		LogError("Failed to add to tray");
     	return 0;
     }
 
@@ -201,7 +206,7 @@ BOOL ToggleTray(HWND hWnd, HINSTANCE hInstance)
 	// set tray properties and toggle showing state based on current window state 'isShowing'
     if (!isShowing)
     {
-	    wchar_t szTip[128] = L"Consoleidator";
+	    const wchar_t szTip[128] = L"Consoleidator";
 		nid.cbSize = sizeof NOTIFYICONDATA;
 		nid.hWnd = hWnd;
 		nid.uID = 100;
@@ -241,7 +246,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		    if (RegisterClass(&wnd) == NULL)
 		    {
 			    MessageBox(nullptr, L"Failed to register title setter window class!", L"Error", MB_ICONERROR);
-				logger::LogError("Failed to register title setter window class!");
+				LogError("Failed to register title setter window class!");
 		        return 0;
 		    }
 
@@ -301,7 +306,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (SetWindowSubclass(hWndEdit, EditSubclassProc, 0, 0) == 0)
 			{
 				MessageBox(nullptr, L"Failed to subclass edit control", L"Error", MB_ICONERROR);
-				logger::LogError("Failed to subclass edit control");
+				LogError("Failed to subclass edit control");
 				return 0;
 			}
 
@@ -378,7 +383,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				{
 					const std::string error{("Failed to show menu: " + std::to_string(GetLastError()))};
 					MessageBoxA(hWnd, error.c_str(), "Error", MB_ICONERROR);
-					logger::LogError(error);
+					LogError(error);
                     return 0;
 				}
 			}
@@ -388,8 +393,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		// we process the menu commands here
 		{
 			const auto wmID = LOWORD(wParam);
-            const auto wmEvent = HIWORD(wParam);
-            switch (wmID)
+			switch (wmID)
 			{
             	// hide the window when we click X
             case ID__SHOW:
@@ -485,29 +489,86 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				// in the EditSubclassProc function
                 ShowTitleSetter();
 				return 0;
+			case HOTKEY_READ_CONSOLE_BUFFER:
+				if (IsConsoleWindow(hForeground)) {
+					InjectDllIntoWindow(MODE_READ_CONSOLE_BUFFER, hForeground);
+
+					while (sharedMemoryStruct->consoleTextBufferSize == NULL)
+					{
+						// wait for the buffer to be ready
+					}
+
+					OPENFILENAMEA ofn;
+				    char szFile[260] = { 0 };
+
+				    ZeroMemory(&ofn, sizeof(ofn));
+				    ofn.lStructSize = sizeof(ofn);
+				    ofn.lpstrFile = szFile;
+				    ofn.nMaxFile = sizeof(szFile);
+				    ofn.lpstrFilter = "Text file (.txt)\0*.TXT\0";
+				    ofn.nFilterIndex = 1;
+				    ofn.lpstrFileTitle = nullptr;
+				    ofn.nMaxFileTitle = 0;
+				    ofn.lpstrInitialDir = nullptr;
+				    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_ENABLEHOOK;
+					ofn.lpstrDefExt = "txt";
+					ofn.lpfnHook = OFNHookProcOldStyle;
+
+				    if (GetSaveFileNameA(&ofn)) {
+				        // Write to file
+				    	HANDLE hFile = CreateFileA(
+							ofn.lpstrFile, 
+							GENERIC_WRITE, 
+							0, 
+							nullptr, 
+							CREATE_ALWAYS, 
+							FILE_ATTRIBUTE_NORMAL, 
+							nullptr
+						);
+
+						if (hFile == INVALID_HANDLE_VALUE)
+						{
+							const std::string error = "Error while opening file: " + std::to_string(GetLastError());
+							MessageBoxA(nullptr, error.c_str(), "Error while opening file", MB_ICONERROR);
+							LogError(error);
+							return 0;
+						}
+
+						if (WriteFile(hFile, sharedMemoryStruct->consoleTextBuffer, sharedMemoryStruct->consoleTextBufferSize, nullptr, nullptr) == FALSE)
+						{
+							const std::string error = "Error while writing to file: " + std::to_string(GetLastError());
+							MessageBoxA(nullptr, error.c_str(), "Error while writing to file", MB_ICONERROR);
+							LogError(error);
+							return 0;
+						}
+
+						CloseHandle(hFile);
+				    }
+					sharedMemoryStruct->consoleTextBufferSize = 0;
+				}
+				return 0;
 			default:
 				return 0;
 			}
 			return 0;
 		}
 	case WM_COPYDATA:
-		// this is used the handle the copied over keybuffer from the low-level keyhook
-		// we decide here if:
+		// this is used the handle the copied over keybuffer from the ConsoleReadBuffer method OR from the low-level keyhook
+		// in the latter case we decide here if:
 		// 1. the hotkey conditions are met => CTRL + SPACE is pressed
 		// 2. the last two characters are eligible for accent replacement
 		// finally we replace the characters and return true to intercept the SPACE keypress from the keyhook
 		{
 			static bool deadkeyAlert = false;
-			const auto pcds = reinterpret_cast<COPYDATASTRUCT*>(lParam);
+ 			const auto pcds = reinterpret_cast<COPYDATASTRUCT*>(lParam);
 
 			// we check if the data originates from the keyhook
 			// this value is a constant defined in both the keyhook and the main apps constants header
 			// we assign this constant to the dwData field in the keyhook to indicate the message originates from the keyhook
-			if (pcds->dwData != WM_COPYDATA_VERIFICATION)
+			if (pcds->dwData != WM_COPYDATA_KEYBUFFER_TYPE)
 			{
 				return DefWindowProc(hWnd, uMsg, wParam, lParam);
 			}
-
 			// since WM_COPYDATA is only sent when space is pressed, we can assume the keypress is VK_SPACE
 			const auto msg = ConvertToMessage(VK_SPACE);
 
@@ -533,7 +594,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			// the lpData field is always a pointer to a character array
 			const std::string translatedBuffer = (char*)pcds->lpData;
 
-			logger::LogInfo("accent replace invoked, buffer contents: " + translatedBuffer);
+			LogInfo("accent replace invoked, buffer contents: " + translatedBuffer);
 
 			// safety measure to prevent segfaults
 			if (translatedBuffer.length() < 2)
@@ -705,7 +766,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while opening foreground process: " + std::to_string(GetLastError());
 	    MessageBoxA(nullptr, error.c_str(), "Error while opening process", MB_ICONERROR);
-		logger::LogError("Error while opening foreground process: " + std::to_string(GetLastError()));
+		LogError("Error while opening foreground process: " + std::to_string(GetLastError()));
         return EXIT_FAILURE;
     }
 
@@ -720,7 +781,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while allocating memory in foreground process: " + std::to_string(GetLastError());
 	    MessageBoxA(nullptr, error.c_str(), "Error while allocating in remote", MB_ICONERROR);
-		logger::LogError("Error while allocating memory in foreground process: " + std::to_string(GetLastError()));
+		LogError("Error while allocating memory in foreground process: " + std::to_string(GetLastError()));
 		CloseHandle(hProcess);
         return EXIT_FAILURE;
     }
@@ -730,7 +791,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while getting kernel32 handle: " + std::to_string(GetLastError());
         MessageBoxA(nullptr, error.c_str(), "Error while getting module handle", MB_ICONERROR);
-		logger::LogError("Error while getting kernel32 handle: " + std::to_string(GetLastError()));
+		LogError("Error while getting kernel32 handle: " + std::to_string(GetLastError()));
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
@@ -742,7 +803,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
     {
 		const std::string error = "Error while writing to foreground process: " + std::to_string(GetLastError());
 		MessageBoxA(nullptr, error.c_str(), "Error while writing to remote", MB_ICONERROR);
-		logger::LogError(error);
+		LogError(error);
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
@@ -774,7 +835,7 @@ BOOL InjectDllIntoWindow(unsigned int uiMode, HWND hForeground, const wchar_t * 
 	{
 		const std::string error = "Error while freeing memory in foreground process: " + std::to_string(GetLastError());
         MessageBoxA(nullptr, error.c_str(), "Error while freeing memory", MB_ICONERROR);
-		logger::LogError(error);
+		LogError(error);
 		CloseHandle(hProcess);
 	    return EXIT_FAILURE;
     }
@@ -815,7 +876,7 @@ BOOL ShowTitleSetter()
     {
 		const std::string error = "Error while setting focus to title window: " + std::to_string(GetLastError());
 		MessageBoxA(nullptr, error.c_str(), "Error while setting focus", MB_ICONERROR);
-		logger::LogError(error);
+		LogError(error);
 		return EXIT_FAILURE;
     }
 
@@ -864,7 +925,7 @@ WPARAM ConvertToMessage(WPARAM key)
     if (bitmask == 0) return 0;
 	for (int i = 0; i < sizeof registeredCombos / sizeof Keycombo; ++i)
 	{
-		if (key == (WPARAM)registeredCombos[i].vkCode && bitmask == registeredCombos[i].bitmask)
+		if (key == static_cast<WPARAM>(registeredCombos[i].vkCode) && bitmask == registeredCombos[i].bitmask)
 			return registeredCombos[i].message;
 	}
     return 0;
@@ -875,13 +936,13 @@ bool DoesLayoutHaveDeadKeys()
 {
 	BYTE kbState[256]{};
 	GetKeyboardState(kbState);
-	HKL layout = GetKeyboardLayout(0);
+	const HKL layout = GetKeyboardLayout(0);
 
 	for (UINT i = 0; i < 256; ++i)
 	{
 		kbState[i] = 0x80;
 		WCHAR chr{};
-		int result = ToUnicodeEx(
+		const int result = ToUnicodeEx(
 			i, 
 			MapVirtualKeyEx(i, MAPVK_VK_TO_VSC, layout), 
 			kbState, 
@@ -903,13 +964,19 @@ bool DoesLayoutHaveDeadKeys()
 KeyDescriptor GetInitKeyStates()
 {
 	KeyDescriptor kd{};
-	SHORT capsLockState = GetKeyState(VK_CAPITAL);
-	SHORT shiftState = GetKeyState(VK_SHIFT);
-	SHORT controlState = GetKeyState(VK_CONTROL);
+	const SHORT capsLockState = GetKeyState(VK_CAPITAL);
+	const SHORT shiftState = GetKeyState(VK_SHIFT);
+	const SHORT controlState = GetKeyState(VK_CONTROL);
 
 	kd.capsToggled = (capsLockState & 0x0001) != 0;
 	kd.shiftDown = (shiftState & 0x8000) != 0;
 	kd.controlDown = (controlState & 0x8000) != 0;
 
 	return kd;
+}
+
+// this is only used to force windows to use old-style file dialog
+UINT_PTR CALLBACK OFNHookProcOldStyle(HWND hdlg, UINT uiMsg, WPARAM wParam, LPARAM lParam)
+{
+	return FALSE;
 }

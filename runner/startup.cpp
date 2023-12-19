@@ -30,12 +30,12 @@ BOOL AddToStartup()
 			MessageBoxW(
 				nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.",
 				L"Error", MB_ICONERROR);
-			logger::LogError("Registry key not found while opening startup registry key");
+			LogError("Registry key not found while opening startup registry key");
 			return TRUE;
 		}
 		MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.",
 		            L"Error", MB_ICONERROR);
-		logger::LogError("Access denied writing to registry.");
+		LogError("Access denied writing to registry.");
 		return FALSE;
 	}
 
@@ -51,7 +51,7 @@ BOOL AddToStartup()
 	{
 		MessageBoxW(nullptr, L"Unable to add to write startup registry.\nCheck if the program has enough privileges.",
 		            L"Error", MB_ICONERROR);
-		logger::LogError("Access denied writing to registry.");
+		LogError("Access denied writing to registry.");
 		return FALSE;
 	}
 
@@ -81,13 +81,13 @@ BOOL RemoveFromStartup()
 			MessageBoxW(
 				nullptr, L"Unable to delete from startup registry.\nCheck if the program has sufficient privileges.",
 				L"Error", MB_ICONERROR);
-			logger::LogError("Registry key not found while opening startup registry key");
+			LogError("Registry key not found while opening startup registry key");
 			CloseHandle(hKey);
 			return TRUE;
 		}
 		MessageBoxW(nullptr, L"Unable to delete from startup registry.\nCheck if the program has sufficient privileges.",
 		            L"Error", MB_ICONERROR);
-		logger::LogError("Access denied writing to registry.");
+		LogError("Access denied writing to registry.");
 		CloseHandle(hKey);
 		return FALSE;
 	}
@@ -102,13 +102,13 @@ BOOL RemoveFromStartup()
 				nullptr,
 				L"Unable to delete from startup registry.\nIt probably wasn't present.\nCheck the log for more information.",
 				L"Error", MB_ICONERROR);
-			logger::LogError("Unable to delete value \"Consoleidator\" due to reason: ERROR_FILE_NOT_FOUND");
+			LogError("Unable to delete value \"Consoleidator\" due to reason: ERROR_FILE_NOT_FOUND");
 			CloseHandle(hKey);
 			return FALSE;
 		}
 		MessageBoxW(nullptr, L"Unable to delete from startup registry.\nCheck if the program has sufficient privileges.",
 		            L"Error", MB_ICONERROR);
-		logger::LogError("Access denied writing to registry.");
+		LogError("Access denied writing to registry.");
 		CloseHandle(hKey);
 		return FALSE;
 	}
@@ -191,13 +191,13 @@ int IsStartup()
 		// couldn't open registry path
 		if (lResult == ERROR_FILE_NOT_FOUND)
 		{
-			logger::LogError("Registry key not found while opening startup registry key,");
+			LogError("Registry key not found while opening startup registry key,");
 			CloseHandle(hKey);
 			return -1;
 		}
 
 		// disable the startup checkbox
-		logger::LogError("Access denied writing to registry. GetLastError returned: " + std::to_string(GetLastError()));
+		LogError("Access denied writing to registry. GetLastError returned: " + std::to_string(GetLastError()));
 		CloseHandle(hKey);
 		// TODO: fix user alerts
 		// the caller should dispatch alerts based on return value
@@ -222,7 +222,7 @@ int IsStartup()
 			CloseHandle(hKey);
 			return FALSE;
 		}
-		logger::LogError("An error occured while checking for startup presence in the registry.");
+		LogError("An error occured while checking for startup presence in the registry.");
 		CloseHandle(hKey);
 		return FALSE;
 	}

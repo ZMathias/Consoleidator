@@ -23,7 +23,7 @@ class Updater
 	[[nodiscard]] int ParseToVersion(const std::string& str) const;
 	[[nodiscard]] std::wstring RenameOld(const wchar_t* lpPath) const;
 	[[nodiscard]] std::vector<std::wstring> ScanForCorrespondingFiles(const wchar_t*) const;
-	[[nodiscard]] static std::wstring GetImageDirectory();
+	[[nodiscard]] static std::wstring GetExecutableDirectory();
 	void DownloadFile(const std::string& url, const std::wstring& fileName) const;
 	void DownloadAndDumpFiles(const nlohmann::json& json) const;
 
@@ -37,10 +37,11 @@ class Updater
 	}
 
 public:
-	std::wstring ImageDirectory{};
+	std::wstring ExecutableDirectory{};
 	explicit Updater(const std::string&& image_version);
 	static int GetMajorWindowsVersion();
 	static void Restart();
-	static bool CheckAdminPrivileges();
+	static void RestartElevated();
+	static bool HasAdminPrivileges();
 };
 

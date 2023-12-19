@@ -10,7 +10,11 @@ constexpr UINT WM_USER_UPDATE_COMPLETE = WM_USER + 3;
 constexpr UINT WM_MAP_AT = WM_USER + 4;
 constexpr UINT WM_MAP_CONTAINS = WM_USER + 5;
 
+// max length of console buffer (500 in X (realistic value) and maximum in Y (scrollable))
+constexpr unsigned int MAXIMUM_CONSOLE_SIZE = (500 * 32766);
+
 // wparam constants for receiving the hotkey message
+// the keycombinations translate to these messages that can later be used in a switch statement
 constexpr WPARAM HOTKEY_TOGGLE_SHOW = 1;
 constexpr WPARAM HOTKEY_CLEAR_CONSOLE = 2;
 constexpr WPARAM HOTKEY_MAXIMIZE_BUFFER = 3;
@@ -23,6 +27,7 @@ constexpr WPARAM HOTKEY_RESET_INVERT = 9;
 constexpr WPARAM HOTKEY_SET_TITLE = 10;
 constexpr WPARAM HOTKEY_HELP = 11;
 constexpr WPARAM HOTKEY_ACCENT_REPLACE = 12;
+constexpr WPARAM HOTKEY_READ_CONSOLE_BUFFER = 13;
 
 // DLL hooking modes set in the mapped memory, the uiMode should be one of these values
 constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
@@ -35,14 +40,15 @@ constexpr unsigned int MODE_RESET = 7;
 constexpr unsigned int MODE_RESET_INVERT = 8;
 constexpr unsigned int MODE_SET_TITLE = 9;
 constexpr unsigned int MODE_HELP = 10;
+constexpr unsigned int MODE_READ_CONSOLE_BUFFER = 11;
 
 constexpr size_t KEY_BUF_LEN = 10;
 
 constexpr wchar_t payloadNameW[] = L"consoleidator-injectable.dll";
 constexpr char payloadNameA[] = "consoleidator-injectable.dll";
 
-// verification constant for WM_COPYDATA
-constexpr DWORD WM_COPYDATA_VERIFICATION = 0x4D4F4F43;
+// type constants for WM_COPYDATA
+constexpr DWORD WM_COPYDATA_KEYBUFFER_TYPE = 0x4D4F4F43;
 
 struct Keycombo
 {
@@ -57,12 +63,16 @@ constexpr int SHIFT_MOD = 0x1;
 constexpr int CONTROL_MOD = 0x2;
 constexpr int ALT_MOD = 0x4;
 
-// 0x4D is the ASCII code for the 'M' key
-// 0x54 is the ASCII code for the 'T' key
+
+// 0x46 is the ASCII code for the 'F' key
+constexpr DWORD VK_F = 0x46;
 // 0x48 is the ASCII code for the 'H' key
-constexpr DWORD VK_M = 0x4D;
-constexpr DWORD VK_T = 0x54;
 constexpr DWORD VK_H = 0x48;
+// 0x4D is the ASCII code for the 'M' key
+constexpr DWORD VK_M = 0x4D;
+// 0x54 is the ASCII code for the 'T' key
+constexpr DWORD VK_T = 0x54;
+
 
 // the message loop uses this table to look for a matching bitmask and key combination
 constexpr Keycombo registeredCombos[] = {
@@ -77,7 +87,8 @@ constexpr Keycombo registeredCombos[] = {
 	{CONTROL_MOD, VK_DOWN, HOTKEY_BACKGROUND_BACKWARD},
 	{CONTROL_MOD | SHIFT_MOD, VK_T, HOTKEY_SET_TITLE},
 	{CONTROL_MOD | SHIFT_MOD, VK_H, HOTKEY_HELP},
-	{CONTROL_MOD, VK_SPACE, HOTKEY_ACCENT_REPLACE}
+	{CONTROL_MOD, VK_SPACE, HOTKEY_ACCENT_REPLACE},
+	{CONTROL_MOD | SHIFT_MOD, VK_F, HOTKEY_READ_CONSOLE_BUFFER}
 };
 
 struct KeyDescriptor
@@ -111,4 +122,9 @@ struct MemoryMapDescriptor
 	// we use the KeyDescriptor at startup to check initial keystates
 	// key states maintained in the hook are only relative to KEYDOWN and KEYUP messages, thus it can be incorrect to assume that, upon startup, every key is in its default state
 	KeyDescriptor initKeyState{};
+
+	// stores the text from the console buffer
+	// in case the user requests it
+	char consoleTextBuffer[MAXIMUM_CONSOLE_SIZE]{};
+	volatile unsigned int consoleTextBufferSize{};
 };

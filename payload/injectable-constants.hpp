@@ -11,6 +11,9 @@
 // length of key buffer queue
 constexpr size_t KEY_BUF_LEN = 10;
 
+// max length of console buffer (500 in X (realistic value) and maximum in Y (scrollable))
+constexpr unsigned int MAXIMUM_CONSOLE_SIZE = (500 * 32766);
+
 // DLL hooking modes set in the mapped memory
 constexpr unsigned int MODE_CLEAR_CONSOLE = 1;
 constexpr unsigned int MODE_MAXIMIZE_BUFFER = 2;
@@ -22,6 +25,7 @@ constexpr unsigned int MODE_RESET = 7;
 constexpr unsigned int MODE_RESET_INVERT = 8;
 constexpr unsigned int MODE_SET_TITLE = 9;
 constexpr unsigned int MODE_HELP = 10;
+constexpr unsigned int MODE_READ_CONSOLE_BUFFER = 11;
 
 // wparam constants for receiving the hotkey message
 constexpr UINT WM_PROCESS_KEY = WM_USER + 1;
@@ -31,9 +35,10 @@ constexpr UINT WM_PROCESS_KEY = WM_USER + 1;
 constexpr DWORD VK_M = 0x4D;
 constexpr DWORD VK_T = 0x54;
 constexpr DWORD VK_H = 0x48;
+constexpr DWORD VK_F = 0x46;
 
 // verification constant for WM_COPYDATA
-constexpr DWORD WM_COPYDATA_VERIFICATION = 0x4D4F4F43;
+constexpr DWORD WM_COPYDATA_KEYBUFFER_TYPE = 0x4D4F4F43;
 
 constexpr DWORD registeredKeys[] = 
 {
@@ -48,7 +53,8 @@ constexpr DWORD registeredKeys[] =
 	VK_HOME,
 	VK_M,
 	VK_T,
-	VK_H
+	VK_H,
+	VK_F
 };
 
 struct KeyDescriptor
@@ -82,4 +88,9 @@ struct MemoryMapDescriptor
 	// we use the KeyDescriptor at startup to check initial keystates
 	// key states maintained in the hook are only relative to KEYDOWN and KEYUP messages, thus it can be incorrect to assume that, upon startup, every key is in its default state
 	KeyDescriptor initKeyState{};
+
+	// stores the text from the console buffer
+	// in case the user requests it
+	char consoleTextBuffer[MAXIMUM_CONSOLE_SIZE]{};
+	volatile unsigned int consoleTextBufferSize{};
 };

@@ -11,7 +11,7 @@ void logger::Log(const std::string& text, const std::string& file, const unsigne
 	hFile = CreateFile(FILE_NAME, FILE_APPEND_DATA, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hFile == INVALID_HANDLE_VALUE)
 	{
-		MessageBoxW(nullptr, L"failed to open debug dump\nreason: invalid handle value returned from CreateFileW", L"Consoleidator error dialog", MB_OK);
+		MessageBoxW(nullptr, (L"failed to open debug dump\nreason: invalid handle with error: " + std::to_wstring(GetLastError())).c_str(), L"Consoleidator error dialog", MB_OK);
 		return;
 	}
 	WriteFile(hFile, text.data(), static_cast<DWORD>(text.size()), nullptr, nullptr);

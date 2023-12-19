@@ -15,6 +15,8 @@ bool capsTransition = false;
 
 KeyDescriptor keyBuffer[KEY_BUF_LEN]{}; // initialize to zero
 
+DWORD GetNumCharsInConsoleBuffer();
+
 void PushBuffer(KeyDescriptor key)
 {
 	for (size_t i = 0; i < KEY_BUF_LEN - 1; ++i)
@@ -161,9 +163,9 @@ extern "C" __declspec(dllexport) LRESULT KeyboardProc(int code, WPARAM wParam, L
 					{
 						const std::string translatedBuffer = translateBuffer();
 						COPYDATASTRUCT cds{};
-						cds.dwData = WM_COPYDATA_VERIFICATION;
+						cds.dwData = WM_COPYDATA_KEYBUFFER_TYPE;
 						cds.cbData = translatedBuffer.size() + 1;
-						cds.lpData = (char*)translatedBuffer.c_str();
+						cds.lpData = const_cast<char*>(translatedBuffer.c_str());
 
 						// send the buffer contents to our parent process for handling
 						// this includes replacing the characters with the accented counterpart
@@ -370,6 +372,32 @@ bool ResetConsole(HANDLE hStdOut, const bool invert = false)
 	return true;
 }
 
+DWORD GetNumCharsInConsoleBuffer(HANDLE hStdOut)
+{
+    CONSOLE_SCREEN_BUFFER_INFO buffer_info{};
+    if(GetConsoleScreenBufferInfo(hStdOut, &buffer_info))
+    {
+	    return (DWORD)((buffer_info.dwSize.X * ( buffer_info.dwCursorPosition.Y + 1)) - 
+			(buffer_info.dwSize.X - ( buffer_info.dwCursorPosition.X)) );
+    }
+        
+	return 0;
+}
+
+bool ReadConsoleBuffer(HANDLE hStdOut)
+{
+	const DWORD numChars = GetNumCharsInConsoleBuffer(hStdOut);
+
+	DWORD charsRead{};
+	if (!ReadConsoleOutputCharacterA(hStdOut, sharedMemoryStruct->consoleTextBuffer, numChars, {0, 0}, &charsRead))
+	{
+		return false;
+	}
+
+	sharedMemoryStruct->consoleTextBuffer[charsRead] = '\0';
+	sharedMemoryStruct->consoleTextBufferSize = charsRead;
+	return true;
+}
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -452,6 +480,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 	            case MODE_HELP:
 					PrintHelp(hStdOut);
 					break;
+				case MODE_READ_CONSOLE_BUFFER:
+					ReadConsoleBuffer(hStdOut);
+					break;
+
     		default:
 				break;
             }

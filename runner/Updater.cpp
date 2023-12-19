@@ -88,7 +88,7 @@ nlohmann::json Updater::CheckForUpdates() const
 
 void Updater::DownloadFile(const std::string& url, const std::wstring& fileName) const
 {
-	const std::wstring fullPath = ImageDirectory + fileName;
+	const std::wstring fullPath = ExecutableDirectory + fileName;
 	const auto buffer = MakeRequest(url);
 	if (buffer.empty()) return;
 	std::ofstream file(fullPath, std::ios::binary);
@@ -123,7 +123,7 @@ int Updater::ParseToVersion(const std::string& str) const
 	return version;
 }
 
-std::wstring Updater::GetImageDirectory()
+std::wstring Updater::GetExecutableDirectory()
 {
 	// make a call to QueryFullProcessImageNameW
 	// to get the image name of the process
@@ -145,14 +145,14 @@ std::vector<std::wstring> Updater::ScanForCorrespondingFiles(const wchar_t* toke
 	std::vector<std::wstring> files;
 	WIN32_FIND_DATA find_data{};
 
-	const auto findStr = this->ImageDirectory + token;
+	const auto findStr = this->ExecutableDirectory + token;
 	const auto hFile = FindFirstFileW(findStr.data(), &find_data);
 
 	if (hFile == INVALID_HANDLE_VALUE) return {};
 
-	files.emplace_back(ImageDirectory + find_data.cFileName);
+	files.emplace_back(ExecutableDirectory + find_data.cFileName);
 	while (FindNextFileW(hFile, &find_data))
-		files.emplace_back(ImageDirectory + find_data.cFileName);
+		files.emplace_back(ExecutableDirectory + find_data.cFileName);
 	return files;
 }
 
@@ -185,28 +185,40 @@ std::wstring Updater::RenameOld(const wchar_t* lpPath) const
 
 Updater::Updater(const std::string&& image_version)
 {
-	// TODO: CHECK THIS CODE
 	LocalVersion = ParseToVersion(image_version);
-	ImageDirectory = GetImageDirectory();
+	ExecutableDirectory = GetExecutableDirectory();
 
+	// CHECK PRIVILEGES
+#ifndef _DEBUG
+	if (!HasAdminPrivileges())
+	{
+		//LogWarning("The program was started without administrative privileges, restarting with UAC.");
+		RestartElevated();
+	}
+#endif
+
+	// UPDATE ROUTINE
+	// check for files left after update
 	const auto residueFiles = ScanForCorrespondingFiles(L"*_OLD*");
 
 	size_t deleteCounter{};
 	for (const auto& file : residueFiles)
+	{
 		if (DeleteFileW(file.data()) == 0)
 		{
-			logger::LogError("error deleting file " + std::to_string(GetLastError()));
+			LogError("error deleting file " + std::to_string(GetLastError()));
 			Restart();
 		}
 		else
 		{
 			deleteCounter++;
 		}
+	}
 
 	if (deleteCounter != 0 && deleteCounter == residueFiles.size())
 	{
-		logger::LogInfo("successfully deleted " + std::to_string(deleteCounter) + " old files.");
-		logger::LogInfo("Update complete.");
+		LogInfo("successfully deleted " + std::to_string(deleteCounter) + " old files.");
+		LogInfo("Update complete.");
 	}
 
 	if (!residueFiles.empty())
@@ -218,11 +230,11 @@ Updater::Updater(const std::string&& image_version)
 	// if it's empty, we're done
 	if (json.empty()) 
 	{
-		logger::LogInfo("No updates available. Current version: " + image_version);
+		LogInfo("No updates available. Current version: " + image_version);
 		return;
 	}
 
-	logger::LogInfo("update available: " + json["tag_name"].get<std::string>() + ", current version: " + image_version + ". Proceeding with update.");
+	LogInfo("update available: " + json["tag_name"].get<std::string>() + ", current version: " + image_version + ". Proceeding with update.");
 
 	const auto files = ScanForCorrespondingFiles(L"consoleidator*");
 	std::vector<std::wstring> oldFiles;
@@ -233,11 +245,12 @@ Updater::Updater(const std::string&& image_version)
 
 	DownloadAndDumpFiles(json);
 	if (files.empty()) return;
+	// UPDATE ROUTINE OVER
 
 	Restart();
 }
 
-bool Updater::CheckAdminPrivileges()
+bool Updater::HasAdminPrivileges()
 {
 	BOOL fIsRunAsAdmin = FALSE;
     DWORD dwError = ERROR_SUCCESS;
@@ -275,7 +288,7 @@ Cleanup:
     // Throw the error if something failed in the function.
     if (ERROR_SUCCESS != dwError)
     {
-		logger::LogError("Couldn't check rights for administrative privileges");
+		LogError("Couldn't check rights for administrative privileges");
         return false;
     }
 
@@ -285,9 +298,9 @@ Cleanup:
 // this restarts the process as is all the while retaining the original privileges
 void Updater::Restart()
 {
-	logger::LogInfo("Restart requested.");
-	const std::wstring ImageDirectory = GetImageDirectory();
-	const std::wstring runFile = ImageDirectory + L"consoleidator.exe";
+	LogInfo("Restart requested.");
+	const std::wstring ExecutableDirectory = GetExecutableDirectory();
+	const std::wstring runFile = ExecutableDirectory + L"consoleidator.exe";
 
 	// set up call to CreateProcessW
 	STARTUPINFO si{};
@@ -303,20 +316,49 @@ void Updater::Restart()
 		FALSE,
 		NORMAL_PRIORITY_CLASS | CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED,
 		nullptr,
-		ImageDirectory.data(),
+		ExecutableDirectory.data(),
 		&si,
 		&pi
 		);
 
 	if (!success)
 	{
-		const std::string error = "Failed to open process";
-		MessageBoxA(nullptr, error.c_str(), "Error", MB_ICONERROR);
-		logger::LogError(error);
+		const std::string error = "Failed to open process, aborting restart.";
+		MessageBoxA(nullptr, error.c_str(), "Restart aborted", MB_ICONERROR);
+		LogError(error);
+		return;
 	}
 
 	CloseHandle(pi.hProcess);
 	ResumeThread(pi.hThread);
 	CloseHandle(pi.hThread);
+	exit(0);
+}
+
+void Updater::RestartElevated()
+{
+	//LogInfo("Elevated restart requested.");
+	const std::wstring ExecutablePath = GetExecutableDirectory();
+	const std::wstring runFile = ExecutablePath + L"consoleidator.exe";
+
+	HINSTANCE hInst = ShellExecuteW(
+		nullptr, 
+		L"runas", 
+		runFile.c_str(), 
+		nullptr, 
+		ExecutablePath.c_str(), 
+		TRUE
+	);
+
+	if ((INT_PTR)hInst <= 32)
+	{
+		const std::string error = "Failed to restart with elevated privileges. Aborting...";
+		MessageBoxA(nullptr, error.c_str(), "Restart aborted", MB_ICONERROR);
+		LogError(error);
+		return;
+	}
+
+	//LogInfo("Successfully spawned new process with elevated privileges. Exiting...");
+
 	exit(0);
 }
