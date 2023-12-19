@@ -221,6 +221,10 @@ void PrintHelp(HANDLE hStdOut)
 		"CTRL + DOWN - Cycle background color backward\n"
 		"CTRL + END - Reset console colors to white on black\n"
 		"CTRL + HOME - Reset console colors to black on white\n"
+		"CTRL + SHIFT + H - Print this help message\n"
+		"CTRL + SHIFT + F - Extract text from console\n"
+		"CTRL + ALT + SHIFT + F5 - Show window\n"
+		"CTRL + SPACE - Accent - Invoke accent replacer\n"
 		"----------------------------------------------------\n";
 	printf("%s", help.c_str());
 }
