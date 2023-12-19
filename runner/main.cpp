@@ -50,7 +50,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.5.9");
+	const Updater updater("v0.6.0");
 	WorkingDirectoryW = updater.ExecutableDirectory;
 	WorkingDirectoryA = ToAscii(WorkingDirectoryW);
 
