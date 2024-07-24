@@ -5,6 +5,7 @@
 #include <CommCtrl.h>
 #include <cstdio>
 #include <string>
+#include <cassert>
 #include "Updater.hpp"
 #include "runner-constants.hpp"
 #include "logger.hpp"
