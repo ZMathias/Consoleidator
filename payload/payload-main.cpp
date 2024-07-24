@@ -399,7 +399,11 @@ bool ReadConsoleBuffer(HANDLE hStdOut)
 	}
 
 	sharedMemoryStruct->consoleTextBuffer[charsRead] = '\0';
-	sharedMemoryStruct->consoleTextBufferSize = charsRead;
+	sharedMemoryStruct->bufferSize = charsRead;
+
+	CONSOLE_SCREEN_BUFFER_INFO bufferInfo{};
+	GetConsoleScreenBufferInfo(hStdOut, &bufferInfo);
+	sharedMemoryStruct->consoleDimensions = bufferInfo.dwSize;
 	return true;
 }
 

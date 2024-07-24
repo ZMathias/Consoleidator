@@ -28,6 +28,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProcTitle(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubClass, DWORD_PTR dwRefData);
 UINT_PTR CALLBACK OFNHookProcOldStyle(HWND, UINT, WPARAM, LPARAM);
+UINT_PTR Lpofnhookproc(HWND, UINT, WPARAM, LPARAM);
 
 WPARAM ConvertToMessage(WPARAM key);
 HHOOK SetKeyboardHook();
@@ -40,6 +41,7 @@ bool DoesLayoutHaveDeadKeys();
 KeyDescriptor GetInitKeyStates();
 HANDLE InitializePipe();
 std::string ReadBufferDataFromPipe(HANDLE);
+std::string FormatBufferString(char*, COORD, const DWORD bufLen);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
@@ -50,7 +52,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 	
-	const Updater updater("v0.6.0");
+	const Updater updater("v0.6.1");
 	WorkingDirectoryW = updater.ExecutableDirectory;
 	WorkingDirectoryA = ToAscii(WorkingDirectoryW);
 
@@ -493,10 +495,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				if (IsConsoleWindow(hForeground)) {
 					InjectDllIntoWindow(MODE_READ_CONSOLE_BUFFER, hForeground);
 
-					while (sharedMemoryStruct->consoleTextBufferSize == NULL)
+					while (sharedMemoryStruct->bufferSize == 0)
 					{
 						// wait for the buffer to be ready
 					}
+
+					std::string formattedBuffer = FormatBufferString(sharedMemoryStruct->consoleTextBuffer, sharedMemoryStruct->consoleDimensions, sharedMemoryStruct->bufferSize);
 
 					OPENFILENAMEA ofn;
 				    char szFile[260] = { 0 };
@@ -510,9 +514,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				    ofn.lpstrFileTitle = nullptr;
 				    ofn.nMaxFileTitle = 0;
 				    ofn.lpstrInitialDir = nullptr;
-				    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_ENABLEHOOK;
+				    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_ENABLEHOOK | OFN_EXPLORER;
 					ofn.lpstrDefExt = "txt";
-					ofn.lpfnHook = OFNHookProcOldStyle;
+					ofn.lpfnHook = Lpofnhookproc;
 
 				    if (GetSaveFileNameA(&ofn)) {
 				        // Write to file
@@ -534,7 +538,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							return 0;
 						}
 
-						if (WriteFile(hFile, sharedMemoryStruct->consoleTextBuffer, sharedMemoryStruct->consoleTextBufferSize, nullptr, nullptr) == FALSE)
+						if (WriteFile(hFile, formattedBuffer.data(), formattedBuffer.size(), nullptr, nullptr) == FALSE)
 						{
 							const std::string error = "Error while writing to file: " + std::to_string(GetLastError());
 							MessageBoxA(nullptr, error.c_str(), "Error while writing to file", MB_ICONERROR);
@@ -544,7 +548,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 						CloseHandle(hFile);
 				    }
-					sharedMemoryStruct->consoleTextBufferSize = 0;
+					sharedMemoryStruct->bufferSize = 0;
+					sharedMemoryStruct->consoleDimensions = {};
 				}
 				return 0;
 			default:
@@ -978,5 +983,34 @@ KeyDescriptor GetInitKeyStates()
 // this is only used to force windows to use old-style file dialog
 UINT_PTR CALLBACK OFNHookProcOldStyle(HWND hdlg, UINT uiMsg, WPARAM wParam, LPARAM lParam)
 {
-	return FALSE;
+	BringWindowToTop(hdlg); // or SetWindowPos 
+    return 0;
+}
+
+UINT_PTR Lpofnhookproc(HWND hdlgChild, UINT uiMsg, WPARAM wParam, LPARAM lParam) {
+    if (uiMsg == WM_INITDIALOG) {
+        BringWindowToTop(GetParent(hdlgChild)); // I think GetParent is needed
+    }
+    return 0;
+}
+
+// wrap the words in the output text file
+// otherwise the output is unusable
+std::string FormatBufferString(char* buf, COORD consoleDimensions, const DWORD bufLen)
+{
+	std::string formatted_str;
+	formatted_str.reserve(consoleDimensions.X * consoleDimensions.Y + consoleDimensions.Y);
+
+	DWORD i = 1;
+	do
+	{
+		formatted_str += *buf;
+		if (i % consoleDimensions.X == 0)
+		{
+			formatted_str += '\n';
+		}
+
+		++buf; ++i;
+	} while (i <= bufLen);
+	return formatted_str;
 }

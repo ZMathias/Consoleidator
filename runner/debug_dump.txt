@@ -62,3 +62,99 @@
 [INFO][2022/12/23 15:17:20](at line: 11 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
 [INFO][2022/12/23 15:18:24](at line: 221 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.5.0
 [INFO][2022/12/23 15:18:24](at line: 11 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 14:59:55](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 14:59:55](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 14:59:56](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 15:8:6](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 15:8:6](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 15:8:7](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 15:14:22](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 15:14:22](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 15:14:22](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 15:17:8](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 15:17:8](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 15:17:9](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:5:2](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:5:2](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:5:2](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:5:39](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:5:39](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:5:39](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:6:6](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:6:6](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:6:6](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:6:22](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:6:22](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:6:22](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:6:50](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:6:50](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:6:51](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:12:12](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:12:12](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:12:12](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:13:10](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:13:10](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:13:10](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:19:0](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:19:0](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:19:0](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:26:37](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:26:37](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:26:37](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:28:56](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:28:56](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:28:56](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:30:19](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:30:19](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:30:19](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:31:22](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:31:22](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:31:22](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:37:29](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:37:29](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:37:29](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:40:10](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:40:10](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:40:11](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:42:32](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:42:33](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:42:33](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:45:34](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:45:34](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:45:34](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:46:1](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:46:1](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:46:1](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:52:23](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:52:23](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:52:23](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 16:56:5](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 16:56:5](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 16:56:5](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 17:0:31](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 17:0:31](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 17:0:31](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2023/12/22 17:8:2](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2023/12/22 17:8:2](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2023/12/22 17:8:2](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2024/1/16 18:34:16](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2024/1/16 18:34:16](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2024/1/16 18:34:16](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2024/1/16 18:35:14](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2024/1/16 18:35:14](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2024/1/16 18:35:14](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2024/1/16 18:37:34](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2024/1/16 18:37:34](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2024/1/16 18:37:34](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2024/1/16 18:39:2](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2024/1/16 18:39:2](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2024/1/16 18:39:2](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2024/1/16 18:39:23](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.0
+[ERROR][2024/1/16 18:39:23](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2024/1/16 18:39:23](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2024/1/16 19:23:54](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.1
+[ERROR][2024/1/16 19:23:54](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2024/1/16 19:23:54](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map
+[INFO][2024/1/16 19:35:56](at line: 237 in file: E:\prj\C++\ConsoleUtilSuite\runner\Updater.cpp) No updates available. Current version: v0.6.1
+[ERROR][2024/1/16 19:35:56](at line: 200 in file: E:\prj\C++\ConsoleUtilSuite\runner\startup.cpp) Access denied writing to registry. GetLastError returned: 0
+[INFO][2024/1/16 19:35:56](at line: 14 in file: E:\prj\C++\ConsoleUtilSuite\runner\accent_map.cpp) No config file present, falling back to built-in accent map

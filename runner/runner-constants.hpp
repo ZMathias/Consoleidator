@@ -44,8 +44,8 @@ constexpr unsigned int MODE_READ_CONSOLE_BUFFER = 11;
 
 constexpr size_t KEY_BUF_LEN = 10;
 
-constexpr wchar_t payloadNameW[] = L"consoleidator-injectable.dll";
-constexpr char payloadNameA[] = "consoleidator-injectable.dll";
+constexpr wchar_t payloadNameW[] = L"consoleidator.dll";
+constexpr char payloadNameA[] = "consoleidator.dll";
 
 // type constants for WM_COPYDATA
 constexpr DWORD WM_COPYDATA_KEYBUFFER_TYPE = 0x4D4F4F43;
@@ -126,5 +126,6 @@ struct MemoryMapDescriptor
 	// stores the text from the console buffer
 	// in case the user requests it
 	char consoleTextBuffer[MAXIMUM_CONSOLE_SIZE]{};
-	volatile unsigned int consoleTextBufferSize{};
+	volatile unsigned int bufferSize{};
+	COORD consoleDimensions{};
 };

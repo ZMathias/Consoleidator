@@ -134,6 +134,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>$(SolutionDir)rename-post.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming $(ProjectName).dll to consoleidator.dll</Message>
+    </PostBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)rename-pre.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming dll to comply with build</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -157,6 +169,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>$(SolutionDir)rename-post.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming $(ProjectName).dll to consoleidator.dll</Message>
+    </PostBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)rename-pre.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming dll to comply with build</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStripped|Win32'">
     <ClCompile>
@@ -180,6 +204,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>$(SolutionDir)rename-post.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming $(ProjectName).dll to consoleidator.dll</Message>
+    </PostBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)rename-pre.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming dll to comply with build</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -199,6 +235,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Message>Renaming $(ProjectName).dll to consoleidator.dll</Message>
+      <Command>$(SolutionDir)rename-post.bat $(SolutionDir)x64\$(Configuration)\</Command>
+    </PostBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)rename-pre.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming dll to comply with build</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -223,6 +271,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>$(SolutionDir)rename-post.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming $(ProjectName).dll to consoleidator.dll</Message>
+    </PostBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)rename-pre.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming dll to comply with build</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStripped|x64'">
     <ClCompile>
@@ -247,6 +307,20 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
     </Link>
+    <PostBuildEvent>
+      <Command>$(SolutionDir)rename-post.bat $(SolutionDir)x64\$(Configuration)\</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Renaming $(ProjectName).dll to consoleidator.dll</Message>
+    </PostBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)rename-pre.bat $(SolutionDir)x64\$(Configuration)\</Command>
+      <Message>Renaming dll to comply with build</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="injectable-constants.hpp" />
